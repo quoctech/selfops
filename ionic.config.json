@@ -1,0 +1,7 @@
+{
+  "name": "Self Ops",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}
