@@ -51,7 +51,7 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
     IonSkeletonText,
   ],
   template: `
-    <ion-header class="ion-no-border">
+    <ion-header class="ion-padding ion-no-border">
       <ion-toolbar>
         <ion-title>Góc nhìn lại ({{ pendingEvents().length }})</ion-title>
       </ion-toolbar>

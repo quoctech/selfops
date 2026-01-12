@@ -11,7 +11,6 @@ import { FormsModule } from '@angular/forms';
 import {
   AlertController,
   IonButton,
-  IonButtons,
   IonContent,
   IonDatetime,
   IonHeader,
@@ -25,13 +24,11 @@ import {
   IonTitle,
   IonToggle,
   IonToolbar,
-  NavController,
   ToastController,
 } from '@ionic/angular/standalone';
 
 import { addIcons } from 'ionicons';
 import {
-  arrowBackOutline,
   checkmarkOutline,
   chevronForwardOutline,
   closeOutline,
@@ -68,24 +65,18 @@ import { NotificationService } from 'src/app/core/services/notification.service'
     IonToggle,
     IonIcon,
     IonButton,
-    IonButtons,
     IonSpinner,
     IonDatetime,
     IonModal,
   ],
   template: `
-    <ion-header class="ion-no-border">
+    <ion-header [translucent]="true" class="ion-padding ion-no-border">
       <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-button (click)="goBack()" color="primary">
-            <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
-          </ion-button>
-        </ion-buttons>
         <ion-title>Cài đặt</ion-title>
       </ion-toolbar>
     </ion-header>
 
-    <ion-content class="ion-padding-vertical settings-content">
+    <ion-content class="settings-content">
       <ion-list [inset]="true">
         <ion-list-header>
           <ion-label>Nhắc nhở & Thông báo</ion-label>
@@ -189,7 +180,7 @@ import { NotificationService } from 'src/app/core/services/notification.service'
         </div>
         <h3 class="app-name">SelfOps</h3>
         <div class="meta-info">
-          <span>Version 1.0.0</span>
+          <span>v1.0.0</span>
           <span class="dot">•</span>
           <span>Build 2026.01</span>
         </div>
@@ -199,29 +190,29 @@ import { NotificationService } from 'src/app/core/services/notification.service'
       <ion-modal
         [isOpen]="isTimeModalOpen()"
         (didDismiss)="onTimeModalDismiss()"
-        [initialBreakpoint]="0.45"
-        [breakpoints]="[0, 0.45]"
+        [initialBreakpoint]="0.5"
+        [breakpoints]="[0, 0.5]"
       >
         <ng-template>
-          <div class="modal-wrapper">
+          <div class="modal-wrapper ion-padding">
             <div class="modal-header">
-              <span class="modal-title">Chọn giờ nhắc</span>
+              <span class="modal-title">Chọn giờ nhắc nhở</span>
             </div>
 
             <ion-datetime
               presentation="time"
-              [value]="selectedIsoTime()"
-              (ionChange)="timeChanged($event)"
+              [value]="tempIsoTime()"
+              (ionChange)="onTimePickerChange($event)"
               [preferWheel]="true"
               class="custom-datetime"
             ></ion-datetime>
 
             <ion-button
               expand="block"
-              (click)="closeModal()"
-              class="confirm-btn"
+              (click)="confirmTimeChange()"
+              class="confirm-btn ion-margin-top"
             >
-              Xong
+              Lưu thay đổi
             </ion-button>
           </div>
         </ng-template>
@@ -230,15 +221,15 @@ import { NotificationService } from 'src/app/core/services/notification.service'
   `,
   styles: [
     `
-      /* Fix nền Dark/Light tự động */
+      /* Background xử lý Dark Mode tự động */
       .settings-content {
-        --background: var(--ion-color-light);
+        --background: var(--ion-color-step-50, #f2f2f7);
       }
       :host-context(body.dark) .settings-content {
-        --background: var(--ion-background-color);
+        --background: #000000;
       }
 
-      /* --- ICON BOX STYLES --- */
+      /* ICON BOXES - iOS Style */
       .icon-box {
         width: 32px;
         height: 32px;
@@ -246,105 +237,97 @@ import { NotificationService } from 'src/app/core/services/notification.service'
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-right: 12px;
+        margin-right: 14px;
         color: white;
         font-size: 18px;
       }
+      /* Màu sắc chuẩn iOS */
       .icon-box.purple {
-        background: #5e5ce6;
+        background-color: #5856d6;
       }
       .icon-box.blue {
-        background: #007aff;
+        background-color: #007aff;
       }
       .icon-box.red {
-        background: #ff3b30;
+        background-color: #ff3b30;
       }
       .icon-box.yellow {
-        background: #ffcc00;
+        background-color: #ffcc00;
       }
       .icon-box.blue-light {
-        background: #5ac8fa;
+        background-color: #32ade6;
       }
 
-      /* Time Badge Styles */
+      /* Time Badge */
       .time-badge {
-        background: var(--ion-color-step-100, #e0e0e0);
-        color: var(--ion-color-dark);
-        padding: 4px 10px;
-        border-radius: 6px;
+        background: var(--ion-color-step-150, #e3e3e3);
+        color: var(--ion-text-color);
+        padding: 6px 12px;
+        border-radius: 8px;
         font-weight: 600;
-        font-size: 0.9rem;
+        font-size: 0.95rem;
+        transition: background 0.2s;
       }
 
-      /* --- MODAL STYLES --- */
+      /* Modal Styling */
       .modal-wrapper {
-        padding: 20px;
         height: 100%;
         background: var(--ion-background-color);
         display: flex;
         flex-direction: column;
         align-items: center;
       }
-      .modal-header {
-        width: 100%;
-        text-align: center;
-        margin-bottom: 20px;
-      }
       .modal-title {
         font-weight: 700;
         font-size: 1.1rem;
       }
-
       .custom-datetime {
         border-radius: 16px;
-        border: 1px solid var(--ion-color-light-shade);
-        overflow: hidden;
+        margin-top: 20px;
+        --background: var(--ion-item-background);
       }
       .confirm-btn {
-        margin-top: 20px;
-        width: 100%;
         --border-radius: 12px;
+        width: 100%;
+        font-weight: 600;
       }
 
-      /* --- FOOTER --- */
+      /* Footer */
       .footer-info {
         display: flex;
         flex-direction: column;
         align-items: center;
         margin-top: 40px;
-        padding-bottom: 60px;
+        padding-bottom: 80px;
         color: var(--ion-color-medium);
         opacity: 0.8;
       }
       .app-logo {
-        width: 56px;
-        height: 56px;
-        background: var(--ion-color-step-150, #e0e0e0);
-        border-radius: 14px;
+        width: 60px;
+        height: 60px;
+        background: var(--ion-color-step-100);
+        border-radius: 16px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 28px;
+        font-size: 30px;
         margin-bottom: 12px;
         color: var(--ion-text-color);
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
       }
       .app-name {
         font-size: 1.2rem;
-        font-weight: 700;
+        font-weight: 800;
         margin: 0 0 6px 0;
         color: var(--ion-text-color);
-        letter-spacing: 0.5px;
       }
       .meta-info {
+        font-size: 0.8rem;
+        font-weight: 500;
         display: flex;
         align-items: center;
-        font-size: 0.85rem;
-        color: var(--ion-color-medium);
-        font-weight: 500;
+        gap: 6px;
       }
       .dot {
-        margin: 0 6px;
         font-weight: bold;
       }
       .copyright {
@@ -354,11 +337,11 @@ import { NotificationService } from 'src/app/core/services/notification.service'
       }
 
       ion-list-header {
-        padding-left: 20px;
-        margin-bottom: 4px;
-        font-size: 0.85rem;
-        text-transform: uppercase;
+        font-size: 0.8rem;
         letter-spacing: 0.5px;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+        color: var(--ion-color-medium);
       }
     `,
   ],
@@ -368,7 +351,6 @@ export class SettingsPage implements OnInit {
   private notiService = inject(NotificationService);
   private alertCtrl = inject(AlertController);
   private toastCtrl = inject(ToastController);
-  private navCtrl = inject(NavController);
 
   // States
   isDarkMode = signal(false);
@@ -377,23 +359,24 @@ export class SettingsPage implements OnInit {
 
   // Notification States
   notificationEnabled = signal(false);
-  selectedTime = signal({ hour: 21, minute: 0 }); // Mặc định 21:00
+  selectedTime = signal({ hour: 21, minute: 0 }); // Giờ chính thức
+  tempTime = signal({ hour: 21, minute: 0 }); // Giờ tạm (trong modal)
 
-  // FIX: Signal điều khiển Modal
   isTimeModalOpen = signal(false);
 
   // Computed
-  selectedIsoTime = computed(() => {
-    const d = new Date();
-    d.setHours(this.selectedTime().hour);
-    d.setMinutes(this.selectedTime().minute);
-    return d.toISOString();
-  });
-
   displayTime = computed(() => {
     const h = this.selectedTime().hour.toString().padStart(2, '0');
     const m = this.selectedTime().minute.toString().padStart(2, '0');
     return `${h}:${m}`;
+  });
+
+  // ISO String cho DateTime Picker (Dùng giờ tạm)
+  tempIsoTime = computed(() => {
+    const d = new Date();
+    d.setHours(this.tempTime().hour);
+    d.setMinutes(this.tempTime().minute);
+    return d.toISOString();
   });
 
   constructor() {
@@ -401,7 +384,6 @@ export class SettingsPage implements OnInit {
       moonOutline,
       cloudDownloadOutline,
       trashBinOutline,
-      arrowBackOutline,
       codeSlashOutline,
       chevronForwardOutline,
       shieldCheckmarkOutline,
@@ -415,10 +397,11 @@ export class SettingsPage implements OnInit {
   async ngOnInit() {
     this.checkTheme();
 
-    // FIX: Load settings theo cấu trúc mới
+    // Load Settings
     const settings = await this.notiService.getSettings();
     this.notificationEnabled.set(settings.isEnabled);
     this.selectedTime.set({ hour: settings.hour, minute: settings.minute });
+    this.tempTime.set({ hour: settings.hour, minute: settings.minute });
 
     const { value } = await Preferences.get({ key: 'theme_dark_mode' });
     this.isDarkMode.set(value === 'true');
@@ -436,16 +419,12 @@ export class SettingsPage implements OnInit {
   async toggleTheme(ev: any) {
     const isDark = ev.detail.checked;
     this.isDarkMode.set(isDark);
-
-    // 1. Bật/Tắt class dark trên body
     document.body.classList.toggle('dark', isDark);
 
-    // 2. LƯU LẠI để lần sau mở app nó nhớ
     await Preferences.set({
       key: 'theme_dark_mode',
       value: isDark ? 'true' : 'false',
     });
-
     Haptics.impact({ style: ImpactStyle.Light });
   }
 
@@ -456,6 +435,7 @@ export class SettingsPage implements OnInit {
     Haptics.impact({ style: ImpactStyle.Light });
 
     if (isChecked) {
+      // Bật lại thì dùng giờ đang lưu
       await this.notiService.scheduleDailyReminder(
         this.selectedTime().hour,
         this.selectedTime().minute
@@ -467,33 +447,38 @@ export class SettingsPage implements OnInit {
     }
   }
 
-  // FIX: Các hàm điều khiển Modal
+  // --- MODAL LOGIC (Tối ưu) ---
   openTimeModal() {
+    // Reset giờ tạm về giờ chính thức mỗi khi mở modal
+    this.tempTime.set(this.selectedTime());
     this.isTimeModalOpen.set(true);
-  }
-
-  closeModal() {
-    this.isTimeModalOpen.set(false);
   }
 
   onTimeModalDismiss() {
     this.isTimeModalOpen.set(false);
   }
 
-  async timeChanged(ev: any) {
-    const dateStr = ev.detail.value;
-    const date = new Date(dateStr);
-    const newHour = date.getHours();
-    const newMinute = date.getMinutes();
+  // Chỉ cập nhật biến tạm khi quay bánh xe (Performance Fix)
+  onTimePickerChange(ev: any) {
+    const date = new Date(ev.detail.value);
+    this.tempTime.set({ hour: date.getHours(), minute: date.getMinutes() });
+  }
 
-    this.selectedTime.set({ hour: newHour, minute: newMinute });
+  // Chỉ lưu và đặt lịch khi bấm nút Xác nhận
+  async confirmTimeChange() {
+    const newTime = this.tempTime();
+    this.selectedTime.set(newTime);
+    this.isTimeModalOpen.set(false);
 
     if (this.notificationEnabled()) {
-      await this.notiService.scheduleDailyReminder(newHour, newMinute);
+      await this.notiService.scheduleDailyReminder(
+        newTime.hour,
+        newTime.minute
+      );
+      this.showToast('Đã cập nhật giờ nhắc', 'success');
     }
   }
 
-  // --- DATA ---
   async exportData() {
     this.isProcessing.set(true);
     this.actionType.set('EXPORT');
@@ -504,9 +489,7 @@ export class SettingsPage implements OnInit {
         this.showToast('Chưa có dữ liệu để sao lưu.', 'warning');
         return;
       }
-      const fileName = `selfops_backup_${Date.now()}.json`;
       const jsonContent = JSON.stringify(data, null, 2);
-
       await Share.share({
         title: 'Sao lưu SelfOps',
         text: jsonContent,
@@ -523,7 +506,8 @@ export class SettingsPage implements OnInit {
   async confirmReset() {
     const alert = await this.alertCtrl.create({
       header: 'Vùng nguy hiểm!',
-      message: 'Bạn có chắc chắn muốn xóa vĩnh viễn toàn bộ nhật ký không?',
+      message:
+        'Hành động này sẽ xóa vĩnh viễn toàn bộ nhật ký. Bạn có chắc chắn không?',
       buttons: [
         { text: 'Thôi', role: 'cancel' },
         {
@@ -544,17 +528,13 @@ export class SettingsPage implements OnInit {
     try {
       await this.db.deleteAll();
       await this.showToast('Đã xóa sạch dữ liệu.', 'success');
-      this.navCtrl.navigateRoot('/home');
+      // Không cần navigate vì đang ở tab Settings
     } catch (error) {
       this.showToast('Lỗi khi xóa dữ liệu.', 'danger');
     } finally {
       this.isProcessing.set(false);
       this.actionType.set(null);
     }
-  }
-
-  goBack() {
-    this.navCtrl.back();
   }
 
   private async showToast(
@@ -568,6 +548,7 @@ export class SettingsPage implements OnInit {
       position: 'top',
       icon: color === 'success' ? 'shield-checkmark-outline' : undefined,
     });
+
     await toast.present();
   }
 }

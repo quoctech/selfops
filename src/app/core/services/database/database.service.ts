@@ -11,6 +11,7 @@ import {
 } from '@capacitor-community/sqlite';
 
 import { CapgoCapacitorDataStorageSqlite as CapacitorDataStorageSqlite } from '@capgo/capacitor-data-storage-sqlite';
+import { AppUtils } from '../../utils/app.utils';
 
 const DB_NAME = 'self_ops_db';
 const TABLE_NAME = 'events';
@@ -274,6 +275,8 @@ export class DatabaseService {
             }
           })
           .filter((e: any) => e !== null)
+          // FIX: Lọc bỏ Daily Logs (nếu có date_str hoặc không có type)
+          .filter((e: any) => !e.date_str && e.type)
           .sort((a: any, b: any) => b.created_at - a.created_at);
 
         const start = page * pageSize;
@@ -301,16 +304,20 @@ export class DatabaseService {
 
     if (this.isWeb) {
       const res = await CapacitorDataStorageSqlite.values();
-      return (res.values || [])
-        .map((v: string) => {
-          try {
-            return JSON.parse(v);
-          } catch {
-            return null;
-          }
-        })
-        .filter((e: any) => e !== null)
-        .sort((a: any, b: any) => b.created_at - a.created_at);
+      return (
+        (res.values || [])
+          .map((v: string) => {
+            try {
+              return JSON.parse(v);
+            } catch {
+              return null;
+            }
+          })
+          .filter((e: any) => e !== null)
+          // FIX: Lọc bỏ Daily Logs
+          .filter((e: any) => !e.date_str && e.type)
+          .sort((a: any, b: any) => b.created_at - a.created_at)
+      );
     } else {
       const res = await this.db.query(
         `SELECT * FROM ${TABLE_NAME} ORDER BY created_at DESC`
@@ -371,7 +378,6 @@ export class DatabaseService {
       // WEB: Lấy hết -> Filter bằng JS
       try {
         const res = await CapacitorDataStorageSqlite.values();
-
         const allEvents = (res.values || [])
           .map((v: string) => {
             try {
@@ -380,16 +386,16 @@ export class DatabaseService {
               return null;
             }
           })
-          .filter((e: any) => e !== null);
+          .filter((e: any) => e !== null)
+          // 👇 FIX 4: Lọc bỏ Daily Logs
+          .filter((e: any) => !e.date_str && e.type);
 
-        // Filter Logic
         return allEvents
           .filter((e: SelfOpsEvent) => {
-            // Lưu ý: Key-Value lưu boolean, SQL lưu 0/1. Cần check kỹ
             const isDue = e.review_due_date <= now;
             return !e.is_reviewed && isDue;
           })
-          .sort((a: any, b: any) => a.review_due_date - b.review_due_date); // Ưu tiên cái cũ nhất (hết hạn lâu nhất)
+          .sort((a: any, b: any) => a.review_due_date - b.review_due_date);
       } catch (e) {
         console.error('Web Pending Error', e);
         return [];
@@ -411,6 +417,60 @@ export class DatabaseService {
         console.error('Native Pending Error', e);
         return [];
       }
+    }
+  }
+
+  // --- DAILY LOGS METHODS ---
+  async getTodayLog() {
+    await this.ensureDbReady();
+    const key = AppUtils.getTodayKey();
+
+    if (this.isWeb) {
+      try {
+        const res = await CapacitorDataStorageSqlite.get({
+          key: `daily_${key}`,
+        });
+        return res.value ? JSON.parse(res.value) : null;
+      } catch {
+        return null;
+      }
+    } else {
+      const query = `SELECT * FROM daily_logs WHERE date_str = ?`;
+      const res = await this.db.query(query, [key]);
+      return res.values?.[0] || null;
+    }
+  }
+
+  async saveDailyLog(score: number, reason: string) {
+    await this.ensureDbReady();
+    const key = AppUtils.getTodayKey();
+    const now = AppUtils.getNow();
+    const uuid = AppUtils.generateUUID();
+
+    if (this.isWeb) {
+      // WEB: Lưu vào kho chung nhưng ID là daily_YYYY-MM-DD
+      const log = {
+        id: uuid,
+        uuid: uuid,
+        date_str: key,
+        score,
+        reason,
+        created_at: now,
+      };
+      await CapacitorDataStorageSqlite.set({
+        key: `daily_${key}`,
+        value: JSON.stringify(log),
+      });
+    } else {
+      // NATIVE: Lưu vào bảng riêng
+      const checkQuery = `SELECT id FROM daily_logs WHERE date_str = ?`;
+      const existing = await this.db!.query(checkQuery, [key]);
+      let finalId = uuid;
+      if (existing.values && existing.values.length > 0) {
+        finalId = existing.values[0].id;
+      }
+      const query = `INSERT OR REPLACE INTO daily_logs (id, date_str, score, reason, created_at) VALUES (?, ?, ?, ?, ?)`;
+      await this.db!.run(query, [finalId, key, score, reason, now]);
     }
   }
 }

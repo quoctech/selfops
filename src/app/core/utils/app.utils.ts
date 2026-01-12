@@ -25,4 +25,13 @@ export class AppUtils {
       .map((e) => e.trim())
       .filter((e) => e !== '');
   }
+
+  static getTodayKey(): string {
+    // YYYY-MM-DD
+    return new Date().toISOString().split('T')[0];
+  }
+
+  static getNow(): number {
+    return Date.now();
+  }
 }
