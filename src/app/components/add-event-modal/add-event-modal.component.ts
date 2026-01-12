@@ -28,7 +28,11 @@ import {
   closeOutline,
   heartOutline,
 } from 'ionicons/icons';
-import { SelfOpsEvent, SelfOpsEventType } from 'src/app/core/models/event.type';
+import {
+  ONE_WEEK_MS,
+  SelfOpsEvent,
+  SelfOpsEventType,
+} from 'src/app/core/models/event.type';
 import { DatabaseService } from 'src/app/core/services/database/database.service';
 import { AppUtils } from 'src/app/core/utils/app.utils';
 
@@ -363,6 +367,8 @@ export class AddEventModalComponent {
         type: this.eventData.type,
         context: this.eventData.context,
         emotion: this.eventData.emotion,
+        is_reviewed: false,
+        review_due_date: Date.now() + ONE_WEEK_MS, // Hẹn 7 ngày sau sẽ Review
         created_at: Date.now(),
       };
 

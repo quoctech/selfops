@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { Platform } from '@ionic/angular/standalone';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { filter } from 'rxjs/operators';
-import { SelfOpsEvent } from '../../models/event.type';
+import { ONE_WEEK_MS, SelfOpsEvent } from '../../models/event.type';
 
 import {
   CapacitorSQLite,
@@ -114,7 +114,7 @@ export class DatabaseService {
 
     const uuid = event.uuid || crypto.randomUUID();
     const now = Date.now();
-    const dueDate = event.review_due_date || now + 7 * 24 * 60 * 60 * 1000;
+    const dueDate = event.review_due_date || now + ONE_WEEK_MS;
 
     const tagsStr = JSON.stringify(event.tags || []);
     const metaStr =
@@ -279,6 +279,86 @@ export class DatabaseService {
         `SELECT COUNT(*) as count FROM ${TABLE_NAME}`
       );
       return res.values?.[0]?.count || 0;
+    }
+  }
+
+  async updateReview(uuid: string, reflection: string, outcome: string) {
+    await this.ensureDbReady();
+    const now = Date.now();
+
+    if (this.isWeb) {
+      // WEB
+      const res = await CapacitorDataStorageSqlite.get({ key: uuid });
+      if (res && res.value) {
+        const evt = JSON.parse(res.value);
+        evt.reflection = reflection;
+        evt.actual_outcome = outcome;
+        evt.updated_at = now;
+        evt.is_reviewed = true;
+        await CapacitorDataStorageSqlite.set({
+          key: uuid,
+          value: JSON.stringify(evt),
+        });
+      }
+    } else {
+      // NATIVE
+      const query = `
+        UPDATE ${TABLE_NAME} 
+        SET reflection = ?, actual_outcome = ?, is_reviewed = 1, updated_at = ? 
+        WHERE uuid = ?
+      `;
+      await this.db.run(query, [reflection, outcome, now, uuid]);
+    }
+  }
+
+  async getPendingReviews(): Promise<SelfOpsEvent[]> {
+    await this.ensureDbReady();
+    const now = Date.now();
+
+    if (this.isWeb) {
+      // WEB: Lấy hết -> Filter bằng JS
+      try {
+        const res = await CapacitorDataStorageSqlite.values();
+
+        const allEvents = (res.values || [])
+          .map((v: string) => {
+            try {
+              return JSON.parse(v);
+            } catch {
+              return null;
+            }
+          })
+          .filter((e: any) => e !== null);
+
+        // Filter Logic
+        return allEvents
+          .filter((e: SelfOpsEvent) => {
+            // Lưu ý: Key-Value lưu boolean, SQL lưu 0/1. Cần check kỹ
+            const isDue = e.review_due_date <= now;
+            return !e.is_reviewed && isDue;
+          })
+          .sort((a: any, b: any) => a.review_due_date - b.review_due_date); // Ưu tiên cái cũ nhất (hết hạn lâu nhất)
+      } catch (e) {
+        console.error('Web Pending Error', e);
+        return [];
+      }
+    } else {
+      // NATIVE: SQL Query tối ưu
+      const query = `
+        SELECT * FROM ${TABLE_NAME} 
+        WHERE is_reviewed = 0 AND review_due_date <= ? 
+        ORDER BY review_due_date ASC
+      `;
+      try {
+        const res = await this.db.query(query, [now]);
+        return (res.values || []).map((item) => ({
+          ...item,
+          is_reviewed: !!item.is_reviewed,
+        })) as SelfOpsEvent[];
+      } catch (e) {
+        console.error('Native Pending Error', e);
+        return [];
+      }
     }
   }
 }

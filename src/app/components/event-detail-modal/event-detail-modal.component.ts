@@ -31,8 +31,10 @@ import {
 import { addIcons } from 'ionicons';
 import {
   bulbOutline,
+  checkmarkCircleOutline, // 👈 Import icon mới
   closeOutline,
   heartOutline,
+  helpBuoyOutline,
   saveOutline,
   timeOutline,
   trashOutline,
@@ -74,7 +76,7 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
           </ion-button>
         </ion-buttons>
 
-        <ion-title>Chi tiết sự kiện</ion-title>
+        <ion-title>Chiêm nghiệm & Đánh giá</ion-title>
 
         <ion-buttons slot="end">
           <ion-button color="danger" (click)="confirmDelete()">
@@ -106,6 +108,7 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         </ion-card-header>
 
         <ion-card-content>
+          <p class="context-label">Bạn đã quyết định/suy nghĩ:</p>
           <p class="context-text">
             {{ evt.context }}
           </p>
@@ -123,40 +126,61 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
       </ion-card>
       }
 
-      <div class="reflection-section">
+      <div class="input-section">
+        <div class="section-header">
+          <ion-icon name="checkmark-circle-outline" color="success"></ion-icon>
+          <h3>Kết quả thực tế</h3>
+        </div>
+        <p class="helper-text">
+          Sau 1 thời gian, chuyện gì đã thực sự xảy ra? Có giống kỳ vọng không?
+        </p>
+
+        <div class="input-wrapper">
+          <ion-textarea
+            [ngModel]="actualOutcome()"
+            (ngModelChange)="actualOutcome.set($event)"
+            rows="3"
+            placeholder="Ví dụ: Kết quả tốt hơn mình nghĩ, khách hàng đã đồng ý..."
+            class="custom-textarea"
+            [autoGrow]="true"
+          ></ion-textarea>
+        </div>
+      </div>
+
+      <div class="input-section ion-margin-top">
         <div class="section-header">
           <ion-icon name="bulb-outline" color="warning"></ion-icon>
           <h3>Góc nhìn lại</h3>
         </div>
 
         <p class="helper-text">
-          Sau khi bình tâm lại, bạn rút ra được bài học gì cho lần sau?
+          Bài học cốt lõi bạn rút ra được để lần sau làm tốt hơn?
         </p>
 
         <div class="input-wrapper">
           <ion-textarea
             [ngModel]="reflectionNote()"
             (ngModelChange)="reflectionNote.set($event)"
-            rows="6"
-            placeholder="Ví dụ: Lần sau mình sẽ kiểm tra kỹ hơn trước khi quyết định..."
+            rows="4"
+            placeholder="Ví dụ: Lần sau mình sẽ kiểm tra kỹ hơn..."
             class="custom-textarea"
             [autoGrow]="true"
           ></ion-textarea>
         </div>
-
-        <ion-button
-          expand="block"
-          class="ion-margin-top save-btn"
-          (click)="saveReflection()"
-          [disabled]="isSaving()"
-        >
-          @if (isSaving()) {
-          <ion-spinner name="crescent"></ion-spinner>
-          } @else {
-          <ion-icon name="save-outline" slot="start"></ion-icon>
-          Lưu bài học }
-        </ion-button>
       </div>
+
+      <ion-button
+        expand="block"
+        class="ion-margin-top save-btn"
+        (click)="saveReflection()"
+        [disabled]="isSaving()"
+      >
+        @if (isSaving()) {
+        <ion-spinner name="crescent"></ion-spinner>
+        } @else {
+        <ion-icon name="save-outline" slot="start"></ion-icon>
+        Hoàn tất Review }
+      </ion-button>
     </ion-content>
   `,
   styles: [
@@ -164,15 +188,14 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
       /* Card hiển thị thông tin cũ */
       .read-only-card {
         margin: 0 0 24px 0;
-        background: var(--ion-color-light); /* Mặc định Light Mode */
+        background: var(--ion-color-light);
         box-shadow: none;
         border-radius: 16px;
         border: 1px solid var(--ion-color-light-shade);
       }
 
-      /* FIX DARK MODE: Đổi màu nền card thành xám đậm khi ở chế độ tối */
       :host-context(body.dark) .read-only-card {
-        background: var(--ion-color-step-100); /* Màu xám đậm */
+        background: var(--ion-color-step-100);
         border-color: var(--ion-color-step-200);
       }
 
@@ -190,6 +213,15 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         gap: 4px;
       }
 
+      .context-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: var(--ion-color-medium);
+        margin-bottom: 6px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+      }
+
       .context-text {
         font-size: 1.1rem;
         color: var(--ion-text-color);
@@ -198,7 +230,6 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         margin-bottom: 16px;
       }
 
-      /* Emotion Chips */
       .emotion-container {
         display: flex;
         flex-wrap: wrap;
@@ -213,8 +244,8 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         margin: 0;
       }
 
-      /* Phần Reflection */
-      .reflection-section {
+      /* Phần Input Section */
+      .input-section {
         padding: 0 4px;
       }
 
@@ -233,9 +264,10 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
       }
 
       .helper-text {
-        margin: 0 0 16px 0;
+        margin: 0 0 12px 0;
         font-size: 0.9rem;
         color: var(--ion-color-medium);
+        line-height: 1.4;
       }
 
       .input-wrapper {
@@ -246,7 +278,6 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
       }
 
-      /* FIX DARK MODE: Input wrapper cũng cần viền tối hơn */
       :host-context(body.dark) .input-wrapper {
         background: var(--ion-color-step-50);
         border-color: var(--ion-color-step-150);
@@ -261,6 +292,7 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         --border-radius: 12px;
         height: 48px;
         font-weight: 600;
+        margin-bottom: 40px; /* Thêm khoảng trống dưới cùng */
       }
     `,
   ],
@@ -269,11 +301,14 @@ export class EventDetailModalComponent {
   // Signals
   protected eventSignal = signal<SelfOpsEvent | null>(null);
   protected reflectionNote = signal('');
-  protected isSaving = signal(false); // Signal cho loading state
+  protected actualOutcome = signal(''); // Signal mới cho Kết quả thực tế
+  protected isSaving = signal(false);
 
   @Input() set event(val: SelfOpsEvent) {
     this.eventSignal.set(val);
     this.reflectionNote.set(val.reflection || '');
+    // Load outcome cũ lên (nếu có)
+    this.actualOutcome.set(val.actual_outcome || '');
   }
 
   private modalCtrl = inject(ModalController);
@@ -288,16 +323,18 @@ export class EventDetailModalComponent {
       timeOutline,
       heartOutline,
       bulbOutline,
+      helpBuoyOutline,
+      checkmarkCircleOutline,
     });
   }
 
-  // Wrapper gọi Utils
   getEventConfig(type: string) {
     return AppUtils.getTypeConfig(type);
   }
 
-  // Wrapper để parse emotion string thành mảng
-  parseEmotions(emoStr: string) {
+  parseEmotions(emoStr: string | string[]) {
+    // Fix nhỏ: Đảm bảo tương thích nếu emotion đã là mảng
+    if (Array.isArray(emoStr)) return emoStr;
     return AppUtils.parseEmotions(emoStr);
   }
 
@@ -312,7 +349,13 @@ export class EventDetailModalComponent {
     this.isSaving.set(true);
 
     try {
-      await this.db.updateReflection(evt.uuid, this.reflectionNote());
+      // Gọi hàm updateReview trong DatabaseService
+      await this.db.updateReview(
+        evt.uuid,
+        this.reflectionNote(),
+        this.actualOutcome() // Truyền thêm kết quả thực tế
+      );
+
       await this.modalCtrl.dismiss(true, 'saved');
     } catch (e) {
       console.error(e);
