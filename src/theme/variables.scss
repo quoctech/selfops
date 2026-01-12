@@ -1,2 +1,164 @@
 // For information on how to create your own theme, please refer to:
 // https://ionicframework.com/docs/theming/
+
+/* ==================================================
+   1. DEFAULT LIGHT MODE (Mặc định - Modern Slate)
+   ================================================== */
+:root {
+    /** MÀU NỀN & TEXT (Light) - Slate 50 & 900 */
+    --ion-background-color: #f8fafc;
+    --ion-background-color-rgb: 248, 250, 252;
+
+    --ion-text-color: #0f172a;
+    --ion-text-color-rgb: 15, 23, 42;
+
+    /** CARD & ITEM (Light) */
+    --ion-item-background: #ffffff;
+    --ion-card-background: #ffffff;
+
+    /** MÀU VIỀN (Light) - Slate 200 */
+    --ion-border-color: #e2e8f0;
+
+    /** PRIMARY COLOR (Blue 600) */
+    --ion-color-primary: #2563eb;
+    --ion-color-primary-rgb: 37, 99, 235;
+    --ion-color-primary-contrast: #ffffff;
+    --ion-color-primary-contrast-rgb: 255, 255, 255;
+    --ion-color-primary-shade: #2056ce;
+    --ion-color-primary-tint: #3b73ef;
+
+    /** SECONDARY (Blue 500) */
+    --ion-color-secondary: #3b82f6;
+    --ion-color-secondary-rgb: 59, 130, 246;
+    --ion-color-secondary-contrast: #ffffff;
+    --ion-color-secondary-contrast-rgb: 255, 255, 255;
+    --ion-color-secondary-shade: #3472d8;
+    --ion-color-secondary-tint: #4f8ef7;
+
+    /** TERTIARY (Indigo) */
+    --ion-color-tertiary: #5260ff;
+    --ion-color-tertiary-rgb: 82, 96, 255;
+    --ion-color-tertiary-contrast: #ffffff;
+    --ion-color-tertiary-contrast-rgb: 255, 255, 255;
+    --ion-color-tertiary-shade: #4854e0;
+    --ion-color-tertiary-tint: #6370ff;
+
+    /** SUCCESS (Green) */
+    --ion-color-success: #2dd36f;
+    --ion-color-success-rgb: 45, 211, 111;
+    --ion-color-success-contrast: #ffffff;
+    --ion-color-success-contrast-rgb: 255, 255, 255;
+    --ion-color-success-shade: #28ba62;
+    --ion-color-success-tint: #42d77d;
+
+    /** WARNING (Yellow) */
+    --ion-color-warning: #ffc409;
+    --ion-color-warning-rgb: 255, 196, 9;
+    --ion-color-warning-contrast: #000000;
+    --ion-color-warning-contrast-rgb: 0, 0, 0;
+    --ion-color-warning-shade: #e0ac08;
+    --ion-color-warning-tint: #ffca22;
+
+    /** DANGER (Red) */
+    --ion-color-danger: #eb445a;
+    --ion-color-danger-rgb: 235, 68, 90;
+    --ion-color-danger-contrast: #ffffff;
+    --ion-color-danger-contrast-rgb: 255, 255, 255;
+    --ion-color-danger-shade: #cf3c4f;
+    --ion-color-danger-tint: #ed576b;
+
+    /** MEDIUM (Slate 500) */
+    --ion-color-medium: #64748b;
+    --ion-color-medium-rgb: 100, 116, 139;
+    --ion-color-medium-contrast: #ffffff;
+    --ion-color-medium-contrast-rgb: 255, 255, 255;
+    --ion-color-medium-shade: #58667a;
+    --ion-color-medium-tint: #748297;
+
+    /** LIGHT (Slate 100) */
+    --ion-color-light: #f1f5f9;
+    --ion-color-light-rgb: 241, 245, 249;
+    --ion-color-light-contrast: #000000;
+    --ion-color-light-contrast-rgb: 0, 0, 0;
+    --ion-color-light-shade: #d4d8db;
+    --ion-color-light-tint: #f2f6fa;
+}
+
+/* ==================================================
+   2. MANUAL DARK MODE (Chỉ kích hoạt khi có class .dark)
+   ================================================== */
+body.dark {
+    /* --- MÀU CỐT LÕI (Slate 900) --- */
+    --ion-background-color: #0f172a;
+    --ion-background-color-rgb: 15, 23, 42;
+
+    --ion-text-color: #f8fafc;
+    --ion-text-color-rgb: 248, 250, 252;
+
+    --ion-border-color: #334155;
+    /* Slate 700 */
+
+    /* --- MÀU KHỐI (Card/Item - Slate 800) --- */
+    --ion-item-background: #1e293b;
+    --ion-card-background: #1e293b;
+
+    /* --- TINH CHỈNH MÀU SẮC CHO NỀN TỐI --- */
+    /* Primary sáng hơn (Blue 400) để dễ đọc */
+    --ion-color-primary: #60a5fa;
+    --ion-color-primary-rgb: 96, 165, 250;
+    --ion-color-primary-contrast: #000000;
+    --ion-color-primary-contrast-rgb: 0, 0, 0;
+    --ion-color-primary-shade: #5491dc;
+    --ion-color-primary-tint: #70ae_fa;
+
+    /* Các màu khác dịu lại (Pastel) */
+    --ion-color-danger: #f87171;
+    --ion-color-warning: #fbbf24;
+    --ion-color-medium: #94a3b8;
+    /* Slate 400 */
+    --ion-color-light: #1e293b;
+    /* Đảo ngược light thành tối */
+
+    /* --- BƯỚC MÀU (STEP COLORS) --- 
+   * Cực kỳ quan trọng để Ionic tính toán màu nền hover/active
+   * và các lớp màu xếp chồng nhau (Layered)
+   */
+    --ion-color-step-50: #1e293b;
+    --ion-color-step-100: #253146;
+    --ion-color-step-150: #2d3a51;
+    --ion-color-step-200: #34425c;
+    --ion-color-step-250: #3c4b67;
+    --ion-color-step-300: #435372;
+    --ion-color-step-350: #4b5c7d;
+    --ion-color-step-400: #526488;
+    --ion-color-step-450: #5a6d93;
+    --ion-color-step-500: #62759e;
+    --ion-color-step-550: #697ea9;
+    --ion-color-step-600: #7186b4;
+    --ion-color-step-650: #788fbf;
+    --ion-color-step-700: #8097ca;
+    --ion-color-step-750: #87a0d5;
+    --ion-color-step-800: #8fa8e0;
+    --ion-color-step-850: #96b1eb;
+    --ion-color-step-900: #9eb9f6;
+    --ion-color-step-950: #a5c2ff;
+}
+
+/* ==================================================
+   3. GLOBAL COMPONENT STYLES
+   ================================================== */
+
+/* Card chung */
+ion-card {
+    border-radius: 16px;
+    /* Bóng đổ nhẹ nhàng (Light mode) */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    transition: all 0.3s ease;
+}
+
+/* Style riêng cho Dark Mode */
+body.dark ion-card {
+    /* Tắt bóng đổ, dùng viền mỏng để tách khối */
+    box-shadow: none;
+    border: 1px solid var(--ion-border-color);
+}
