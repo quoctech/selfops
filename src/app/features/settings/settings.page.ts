@@ -180,7 +180,7 @@ import { NotificationService } from 'src/app/core/services/notification.service'
         </div>
         <h3 class="app-name">SelfOps</h3>
         <div class="meta-info">
-          <span>v1.0.0</span>
+          <span>v1.2.0</span>
           <span class="dot">•</span>
           <span>Build 2026.01</span>
         </div>
