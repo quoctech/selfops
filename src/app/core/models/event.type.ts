@@ -10,6 +10,9 @@ export interface SelfOpsEvent {
   context: string;
   emotion: string;
   reflection?: string | null;
+  actual_outcome?: string;
+  is_reviewed: boolean;
+  review_due_date: number;
   created_at: number;
 }
 
@@ -31,3 +34,6 @@ export const EVENT_CONFIG = {
     color: 'warning',
   },
 };
+
+// 1. Định nghĩa hằng số thời gian (7 ngày tính bằng mili-giây)
+export const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;

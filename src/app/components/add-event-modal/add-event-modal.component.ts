@@ -2,10 +2,18 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  computed,
   inject,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { PluginListenerHandle } from '@capacitor/core';
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import { Keyboard } from '@capacitor/keyboard';
 import {
   IonButton,
   IonButtons,
@@ -20,6 +28,7 @@ import {
   IonTitle,
   IonToolbar,
   ModalController,
+  Platform,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
@@ -28,12 +37,25 @@ import {
   closeOutline,
   heartOutline,
 } from 'ionicons/icons';
-import { SelfOpsEvent, SelfOpsEventType } from 'src/app/core/models/event.type';
+import {
+  ONE_WEEK_MS,
+  SelfOpsEvent,
+  SelfOpsEventType,
+} from 'src/app/core/models/event.type';
 import { DatabaseService } from 'src/app/core/services/database/database.service';
 import { AppUtils } from 'src/app/core/utils/app.utils';
 
-// 👇 1. IMPORT HAPTICS
-import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+// Static Data: Khai báo ngoài class để không tốn bộ nhớ khởi tạo lại
+const EMOTION_CHIPS = [
+  'Lo lắng',
+  'Tức giận',
+  'Hào hứng',
+  'Mệt mỏi',
+  'Tự tin',
+  'Vội vàng',
+  'Buồn',
+  'Biết ơn',
+];
 
 @Component({
   selector: 'app-add-event-modal',
@@ -71,13 +93,10 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
             color="primary"
             (click)="save()"
             [strong]="true"
-            [disabled]="isSaving() || !eventData.context"
+            [disabled]="isSaving() || !context()"
           >
             @if (isSaving()) {
-            <ion-spinner
-              name="crescent"
-              style="width: 24px; height: 24px;"
-            ></ion-spinner>
+            <ion-spinner name="crescent" class="custom-spinner"></ion-spinner>
             } @else {
             <ion-icon
               slot="icon-only"
@@ -90,34 +109,35 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
       </ion-toolbar>
     </ion-header>
 
-    <ion-content class="ion-padding">
+    <ion-content class="ion-padding" #content>
       <div class="segment-container">
         <ion-segment
-          [(ngModel)]="eventData.type"
-          [color]="currentSegmentColor"
+          [value]="selectedType()"
+          (ionChange)="onTypeChange($event)"
+          [color]="dynamicColor()"
           mode="ios"
           class="custom-segment"
-          (ionChange)="hapticSelection()"
         >
-          @for (type of eventTypes; track type) {
-          <ion-segment-button [value]="type">
-            <ion-label class="segment-text">{{ getLabel(type) }}</ion-label>
+          @for (item of uiEventTypes; track item.value) {
+          <ion-segment-button [value]="item.value">
+            <ion-label class="segment-text">{{ item.label }}</ion-label>
           </ion-segment-button>
           }
         </ion-segment>
       </div>
 
-      <div class="input-container">
+      <div class="input-container" #inputContainer>
         <ion-textarea
           class="custom-textarea"
-          [(ngModel)]="eventData.context"
-          rows="6"
+          [ngModel]="context()"
+          (ngModelChange)="context.set($event)"
+          rows="5"
           label="Nội dung sự kiện"
           labelPlacement="floating"
-          placeholder="Ví dụ: Đã chốt được phương án deploy mới, hoặc lỡ tay xóa nhầm data..."
+          placeholder="Ví dụ: Đã chốt được phương án deploy mới..."
           [autoGrow]="true"
-        >
-        </ion-textarea>
+          inputmode="text"
+        ></ion-textarea>
       </div>
 
       <div class="emotion-section">
@@ -130,10 +150,10 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
           @for (emo of emotionChips; track emo) {
           <div
             class="custom-chip"
-            [class.active]="isEmotionSelected(emo)"
-            (click)="selectEmotion(emo)"
+            [class.active]="selectedEmotions().has(emo)"
+            (click)="toggleEmotion(emo)"
           >
-            @if(isEmotionSelected(emo)) {
+            @if(selectedEmotions().has(emo)) {
             <ion-icon name="checkmark-circle" class="check-icon"></ion-icon>
             }
             <span>{{ emo }}</span>
@@ -141,24 +161,31 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
           }
         </div>
       </div>
+
+      <div class="keyboard-spacer"></div>
     </ion-content>
   `,
   styles: [
     `
-      /* ... Giữ nguyên style cũ của bạn ... */
-      /* Header & Toolbar */
+      /* === OPTIMIZED CSS === */
+
+      /* Utilities */
+      .custom-spinner {
+        width: 24px;
+        height: 24px;
+      }
       ion-toolbar {
         --border-style: none;
       }
 
+      /* Segment */
       .segment-container {
         margin-bottom: 24px;
         padding: 4px;
         background: var(--ion-color-light);
         border-radius: 12px;
-      }
-      :host-context(body.dark) .segment-container {
-        background: var(--ion-color-step-100);
+        /* Performance: Giúp trình duyệt paint riêng layer này */
+        contain: content;
       }
 
       ion-segment-button {
@@ -166,11 +193,8 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
         --padding-end: 4px;
         min-width: auto;
       }
-
       .segment-text {
         white-space: normal;
-        text-overflow: clip;
-        overflow: visible;
         font-size: 0.85rem;
         line-height: 1.1;
         padding: 4px 0;
@@ -178,6 +202,7 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
         letter-spacing: 0.3px;
       }
 
+      /* Input Box */
       .input-container {
         background: var(--ion-card-background);
         border-radius: 16px;
@@ -185,10 +210,8 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
         margin-bottom: 24px;
         border: 1px solid var(--ion-color-step-150, #e0e0e0);
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
-        transition: border-color 0.3s;
-      }
-      :host-context(body.dark) .input-container {
-        border-color: var(--ion-color-step-200);
+        transition: border-color 0.2s ease;
+        contain: content;
       }
       .input-container:focus-within {
         border-color: var(--ion-color-primary);
@@ -203,6 +226,7 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
         line-height: 1.6;
       }
 
+      /* Emotion Section */
       .emotion-section {
         margin-top: 10px;
       }
@@ -220,8 +244,11 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
+        /* Fix layout shift */
+        min-height: 40px;
       }
 
+      /* Chip Styles - Tối ưu selector */
       .custom-chip {
         display: inline-flex;
         align-items: center;
@@ -234,24 +261,21 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
         font-weight: 500;
         cursor: pointer;
         user-select: none;
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1),
+          background-color 0.2s;
         border: 1px solid transparent;
+        /* Performance: Báo trước cho trình duyệt */
+        will-change: transform, background-color;
       }
-      :host-context(body.dark) .custom-chip {
-        background-color: var(--ion-color-step-150);
-      }
-      .custom-chip:hover {
-        background-color: var(--ion-color-step-100);
-      }
-      :host-context(body.dark) .custom-chip:hover {
-        background-color: var(--ion-color-step-250);
-      }
+
+      .custom-chip:active {
+        transform: scale(0.95);
+      } /* Feedback vật lý */
 
       .custom-chip.active {
         background-color: var(--ion-color-primary);
         color: white;
         box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.3);
-        transform: translateY(-2px);
         padding-left: 12px;
         font-weight: 600;
       }
@@ -259,7 +283,7 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
       .check-icon {
         margin-right: 6px;
         font-size: 1.1rem;
-        animation: scaleIn 0.2s ease-out;
+        animation: scaleIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       }
       @keyframes scaleIn {
         from {
@@ -271,39 +295,61 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
           width: 1.1rem;
         }
       }
+
+      .keyboard-spacer {
+        height: 350px;
+        pointer-events: none;
+      }
+
+      /* --- DARK MODE OVERRIDES --- */
+      :host-context(body.dark) {
+        .segment-container {
+          background: var(--ion-color-step-100);
+        }
+        .input-container {
+          border-color: var(--ion-color-step-200);
+        }
+        .custom-chip {
+          background-color: var(--ion-color-step-150);
+        }
+        .custom-chip:hover {
+          background-color: var(--ion-color-step-250);
+        }
+      }
     `,
   ],
 })
-export class AddEventModalComponent {
+export class AddEventModalComponent implements OnInit, OnDestroy {
+  // Signals quản lý State (Reactive & Performant)
   isSaving = signal(false);
+  selectedType = signal<SelfOpsEventType>(SelfOpsEventType.DECISION);
+  context = signal('');
 
-  eventData = {
-    type: SelfOpsEventType.DECISION,
-    context: '',
-    emotion: '',
-  };
+  // Tối ưu: Dùng Set để lookup O(1)
+  selectedEmotions = signal<Set<string>>(new Set());
 
-  eventTypes = Object.values(SelfOpsEventType);
-  emotionChips = [
-    'Lo lắng',
-    'Tức giận',
-    'Hào hứng',
-    'Mệt mỏi',
-    'Tự tin',
-    'Vội vàng',
-    'Buồn',
-    'Biết ơn',
-  ];
+  readonly emotionChips = EMOTION_CHIPS;
+  // Pre-calculate Labels cho HTML đỡ phải gọi function
+  readonly uiEventTypes = Object.values(SelfOpsEventType).map((type) => ({
+    value: type,
+    label: AppUtils.getTypeConfig(type).label,
+  }));
+
+  @ViewChild('content') content!: IonContent;
+  @ViewChild('inputContainer', { read: ElementRef })
+  inputContainer!: ElementRef;
 
   private modalCtrl = inject(ModalController);
   private databaseService = inject(DatabaseService);
+  private platform = inject(Platform);
+  private keyboardListener: PluginListenerHandle | undefined;
 
   constructor() {
     addIcons({ heartOutline, closeOutline, checkmarkCircle, checkmarkOutline });
   }
 
-  get currentSegmentColor(): string {
-    switch (this.eventData.type) {
+  dynamicColor = computed(() => {
+    switch (this.selectedType()) {
       case SelfOpsEventType.DECISION:
         return 'primary';
       case SelfOpsEventType.MISTAKE:
@@ -313,36 +359,48 @@ export class AddEventModalComponent {
       default:
         return 'primary';
     }
+  });
+
+  ngOnInit() {
+    if (this.platform.is('capacitor')) {
+      this.initKeyboardLogic();
+    }
   }
 
-  getLabel(type: SelfOpsEventType) {
-    return AppUtils.getTypeConfig(type).label;
+  ngOnDestroy() {
+    if (this.keyboardListener) this.keyboardListener.remove();
   }
 
-  isEmotionSelected(emo: string): boolean {
-    return this.eventData.emotion.split(',').includes(emo);
+  async initKeyboardLogic() {
+    this.keyboardListener = await Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        const el = this.inputContainer.nativeElement;
+        const y = el.offsetTop - 16;
+        this.content.scrollToPoint(0, y, 300);
+      }
+    );
+    await Keyboard.setAccessoryBarVisible({ isVisible: true });
   }
 
-  // 👇 Helper: Rung nhẹ khi chọn item (Selection)
-  async hapticSelection() {
+  async onTypeChange(ev: any) {
+    this.selectedType.set(ev.detail.value);
     await Haptics.selectionStart();
     await Haptics.selectionChanged();
     await Haptics.selectionEnd();
   }
 
-  selectEmotion(emo: string) {
-    // 2. Rung nhẹ khi chọn cảm xúc
+  toggleEmotion(emo: string) {
     Haptics.impact({ style: ImpactStyle.Light });
 
-    let tags = this.eventData.emotion ? this.eventData.emotion.split(',') : [];
-    tags = tags.map((t) => t.trim()).filter((t) => t !== '');
-
-    if (tags.includes(emo)) {
-      tags = tags.filter((t) => t !== emo);
+    // Update Set immutable way
+    const currentSet = new Set(this.selectedEmotions());
+    if (currentSet.has(emo)) {
+      currentSet.delete(emo);
     } else {
-      tags.push(emo);
+      currentSet.add(emo);
     }
-    this.eventData.emotion = tags.join(',');
+    this.selectedEmotions.set(currentSet);
   }
 
   cancel() {
@@ -350,32 +408,30 @@ export class AddEventModalComponent {
   }
 
   async save() {
-    if (!this.eventData.context) return;
+    const text = this.context();
+    if (!text) return;
 
-    // 3. Rung MEDIUM khi bấm nút Lưu (Cảm giác chắc tay)
     await Haptics.impact({ style: ImpactStyle.Medium });
-
     this.isSaving.set(true);
 
     try {
+      const emotionStr = Array.from(this.selectedEmotions()).join(',');
+
       const newEvent: SelfOpsEvent = {
         uuid: AppUtils.generateUUID(),
-        type: this.eventData.type,
-        context: this.eventData.context,
-        emotion: this.eventData.emotion,
+        type: this.selectedType(),
+        context: text,
+        emotion: emotionStr,
+        is_reviewed: false,
+        review_due_date: Date.now() + ONE_WEEK_MS,
         created_at: Date.now(),
       };
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
       await this.databaseService.addEvent(newEvent);
-
-      // 4. Rung SUCCESS khi lưu thành công (Rung kép: tạch-tạch)
       await Haptics.notification({ type: NotificationType.Success });
-
       await this.modalCtrl.dismiss(true, 'confirm');
     } catch (e) {
       console.error(e);
-      // Rung ERROR nếu lỗi (Rung dài)
       await Haptics.notification({ type: NotificationType.Error });
     } finally {
       this.isSaving.set(false);

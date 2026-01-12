@@ -18,7 +18,7 @@ import {
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
-  alertCircleOutline, // Icon Sự cố
+  alertCircleOutline,
   batteryDeadOutline,
   close,
   helpBuoyOutline,
@@ -28,7 +28,6 @@ import {
 import { SelfOpsEvent, SelfOpsEventType } from 'src/app/core/models/event.type';
 import { AppUtils } from 'src/app/core/utils/app.utils';
 
-// MAP màu chuẩn theo biến CSS của Ionic để đồng bộ Theme
 const COLOR_MAP: Record<string, string> = {
   [SelfOpsEventType.DECISION]: 'var(--ion-color-primary)', // Xanh
   [SelfOpsEventType.MISTAKE]: 'var(--ion-color-danger)', // Đỏ

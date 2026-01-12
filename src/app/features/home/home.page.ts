@@ -8,7 +8,6 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
 import { ViewWillEnter } from '@ionic/angular';
 
 import { addIcons } from 'ionicons';
@@ -23,16 +22,12 @@ import {
   happyOutline,
   helpBuoyOutline,
   searchOutline,
-  settingsOutline,
   statsChartOutline,
   timeOutline,
 } from 'ionicons/icons';
 
 import {
   InfiniteScrollCustomEvent,
-  IonButton,
-  IonButtons,
-  IonChip,
   IonContent,
   IonFab,
   IonFabButton,
@@ -40,13 +35,11 @@ import {
   IonIcon,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
-  IonLabel,
   IonList,
   IonRefresher,
   IonRefresherContent,
   IonRippleEffect,
   IonSearchbar,
-  IonTitle,
   IonToolbar,
   ModalController,
 } from '@ionic/angular/standalone';
@@ -57,6 +50,7 @@ import { StatsModalComponent } from 'src/app/components/stats-modal/stats-modal.
 import { SelfOpsEvent, SelfOpsEventType } from 'src/app/core/models/event.type';
 import { DatabaseService } from 'src/app/core/services/database/database.service';
 import { AppUtils } from 'src/app/core/utils/app.utils';
+import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.component';
 
 @Component({
   selector: 'app-home',
@@ -67,48 +61,35 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
     FormsModule,
     IonHeader,
     IonToolbar,
-    IonTitle,
     IonContent,
     IonList,
-    IonLabel,
     IonIcon,
     IonFab,
     IonFabButton,
     IonSearchbar,
-    IonButtons,
-    IonButton,
-    IonChip,
     IonInfiniteScroll,
     IonInfiniteScrollContent,
     IonRefresher,
     IonRefresherContent,
     IonRippleEffect,
+    DailyCheckInComponent,
   ],
   template: `
     <ion-header
-      [translucent]="false"
-      class="ion-padding ion-no-border header-solid"
+      [translucent]="true"
+      class="ion-padding ion-no-border main-header"
     >
       <ion-toolbar>
-        <ion-title class="brand-title">
-          <span class="text-gradient">SelfOps</span><span class="dot">.</span>
-        </ion-title>
-
-        <ion-buttons slot="end">
-          <ion-button (click)="goToSettings()" color="medium">
-            <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
-          </ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-
-      <div class="dashboard-container">
-        <div class="header-action-row">
-          <div class="greeting-box">
+        <div class="header-inner ion-padding-horizontal">
+          <div class="brand-section">
+            <h1 class="brand-title">
+              <span class="text-gradient">SelfOps</span
+              ><span class="dot">.</span>
+            </h1>
             <p class="date-label">
               <ion-icon name="calendar-outline"></ion-icon>
               {{ today | date : 'EEEE, dd/MM' }}
             </p>
-            <h1 class="greeting-title">{{ getGreeting() }}</h1>
           </div>
 
           <div
@@ -118,6 +99,18 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
             <ion-icon name="stats-chart-outline"></ion-icon>
             <ion-ripple-effect></ion-ripple-effect>
           </div>
+        </div>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content [fullscreen]="true" class="main-content">
+      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
+
+      <div class="dashboard-scrollable ion-padding-horizontal ion-padding-top">
+        <div class="section-checkin">
+          <app-daily-checkin></app-daily-checkin>
         </div>
 
         <div class="stats-grid">
@@ -134,7 +127,7 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
             >
               <ion-icon
                 [name]="conf.icon"
-                style="color: #ffffff; font-size: 18px;"
+                style="color: #ffffff; font-size: 24px;"
               ></ion-icon>
             </div>
             <div class="stat-info">
@@ -145,36 +138,29 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
           </div>
           }
         </div>
+      </div>
 
-        <div class="search-section">
-          <ion-searchbar
-            placeholder="Tìm nhật ký..."
-            [debounce]="300"
-            (ionInput)="handleSearch($event)"
-            class="custom-searchbar"
-            mode="ios"
-          ></ion-searchbar>
+      <div class="sticky-tools ion-padding-horizontal">
+        <ion-searchbar
+          placeholder="Tìm kiếm dòng suy nghĩ..."
+          [debounce]="300"
+          (ionInput)="handleSearch($event)"
+          class="custom-searchbar"
+          mode="ios"
+        ></ion-searchbar>
 
-          @if (filterType() !== 'ALL') {
-          <div class="filter-indicator">
-            <ion-chip color="dark" (click)="handleFilterChange('ALL')">
-              <ion-icon name="close-circle"></ion-icon>
-              <ion-label
-                >Đang lọc: {{ getEventConfig(filterType()).label }}</ion-label
-              >
-            </ion-chip>
-          </div>
-          }
+        @if (filterType() !== 'ALL') {
+        <div class="filter-badge fade-in" (click)="handleFilterChange('ALL')">
+          <span>Đang lọc: {{ getEventConfig(filterType()).label }}</span>
+          <ion-icon name="close-circle"></ion-icon>
+        </div>
+        }
+
+        <div class="timeline-divider">
+          <h3>Dòng thời gian</h3>
+          <span class="count-badge">{{ displayEvents().length }}</span>
         </div>
       </div>
-    </ion-header>
-
-    <ion-content [fullscreen]="true" class="main-content">
-      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
-        <ion-refresher-content></ion-refresher-content>
-      </ion-refresher>
-
-      <div class="list-spacer"></div>
 
       <ion-list lines="none" class="timeline-list">
         @for (event of displayEvents(); track event.uuid) { @let config =
@@ -226,7 +212,7 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
             {{
               searchQuery()
                 ? 'Thử từ khóa khác xem sao.'
-                : 'Hành trình vạn dặm bắt đầu từ dòng code đầu tiên.'
+                : 'Hãy bắt đầu ghi lại dòng suy nghĩ đầu tiên.'
             }}
           </p>
         </div>
@@ -252,28 +238,37 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
   `,
   styles: [
     `
-      /* HEADER & TOOLBAR */
-      .header-solid {
-        background: var(--ion-background-color);
-        border-bottom: 1px solid var(--ion-color-step-100, #e0e0e0);
-      }
-      ion-toolbar {
-        --background: var(--ion-background-color);
-        --min-height: 56px;
-      }
-      .dashboard-container {
-        background-color: var(--ion-background-color);
-        padding: 0 16px 12px 16px;
-        position: relative;
-        z-index: 10;
+      /* PERFORMANCE: Ẩn scrollbar để giao diện sạch */
+      ion-content::part(scroll)::-webkit-scrollbar {
+        display: none;
       }
 
-      /* --- BRANDING PRO --- */
+      /* --- HEADER & BRANDING --- */
+      ion-toolbar {
+        --background: transparent;
+      }
+      .main-header {
+        /* Fallback color cho máy yếu */
+        background: var(--ion-background-color);
+        background: rgba(var(--ion-background-color-rgb), 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+
+      .header-inner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 4px;
+        padding-bottom: 4px;
+      }
+
       .brand-title {
-        font-size: 1.5rem;
+        font-size: 1.6rem;
         font-weight: 800;
+        margin: 0;
         letter-spacing: -0.5px;
-        padding-inline: 0;
+        line-height: 1;
       }
 
       .text-gradient {
@@ -287,91 +282,63 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         -webkit-text-fill-color: transparent;
         display: inline-block;
       }
-
       .dot {
         color: var(--ion-color-primary);
         font-size: 1.8rem;
         line-height: 0;
-        margin-left: 1px;
       }
 
-      /* --- GREETING & STATS --- */
-      .header-action-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 20px;
-      }
-      .greeting-box {
-        flex: 1;
-      }
       .date-label {
-        margin: 0 0 4px 0;
-        font-size: 0.8rem;
+        margin: 4px 0 0 0;
+        font-size: 0.75rem;
         color: var(--ion-color-medium);
         display: flex;
         align-items: center;
         gap: 4px;
         text-transform: capitalize;
-        font-weight: 600;
-      }
-      .greeting-title {
-        margin: 0;
-        font-size: 1.8rem;
-        font-weight: 800;
-        color: var(--ion-text-color);
-        letter-spacing: -0.5px;
-        line-height: 1.1;
+        font-weight: 500;
       }
 
-      /* 👇 STATS BUTTON */
       .stats-btn-wrapper {
-        width: 48px;
-        height: 48px;
-        border-radius: 50%;
-        background: var(--ion-card-background);
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
         display: flex;
         align-items: center;
         justify-content: center;
-        position: relative;
-        cursor: pointer;
         color: var(--ion-color-primary);
-        font-size: 1.4rem;
-        border: 1px solid var(--ion-color-step-150, #e0e0e0);
+        font-size: 1.3rem;
+        background: rgba(var(--ion-color-primary-rgb), 0.1);
+        border: 1px solid rgba(var(--ion-color-primary-rgb), 0.2);
         animation: pulse-glow 3s infinite ease-in-out;
-        transition: transform 0.1s;
-      }
-      .stats-btn-wrapper:active {
-        transform: scale(0.95);
-      }
-      :host-context(body.dark) .stats-btn-wrapper {
-        border-color: var(--ion-color-step-250);
-        color: var(--ion-color-primary-tint);
+        /* PERFORMANCE: Tách layer riêng cho animation */
+        will-change: transform, box-shadow;
       }
       @keyframes pulse-glow {
         0%,
         100% {
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05),
-            0 0 0 rgba(var(--ion-color-primary-rgb), 0);
+          box-shadow: 0 0 0 0 rgba(var(--ion-color-primary-rgb), 0.4);
         }
         50% {
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05),
-            0 0 16px rgba(var(--ion-color-primary-rgb), 0.3);
-          border-color: rgba(var(--ion-color-primary-rgb), 0.4);
+          box-shadow: 0 0 0 6px rgba(var(--ion-color-primary-rgb), 0);
         }
       }
 
-      /* WIDGET GRID */
+      /* --- DASHBOARD --- */
+      .section-checkin {
+        margin-bottom: 16px;
+      }
+
       .stats-grid {
         display: grid;
         grid-template-columns: 1fr 1fr 1fr;
         gap: 10px;
-        margin-bottom: 16px;
+        margin-bottom: 24px;
       }
       .mini-card {
         background: var(--ion-card-background);
         border-radius: 14px;
-        padding: 10px;
+        padding: 10px 4px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -379,80 +346,133 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         border: 1px solid var(--ion-color-light-shade);
         position: relative;
         overflow: hidden;
-        transition: all 0.2s ease;
+        transition: transform 0.1s;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+        /* PERFORMANCE: Tối ưu render */
+        contain: content;
       }
-      :host-context(body.dark) .mini-card {
-        border-color: var(--ion-color-step-150);
+      .mini-card:active {
+        transform: scale(0.96);
       }
       .mini-card.active {
         background: var(--ion-color-light);
-        border-color: var(--ion-color-medium);
-        transform: translateY(-2px);
+        border-color: var(--ion-color-primary);
       }
+
       .icon-box {
-        width: 28px;
-        height: 28px;
-        border-radius: 8px;
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
         margin-bottom: 6px;
-        font-size: 1rem;
-        /* Thêm shadow nhẹ cho box */
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       }
+
+      .stat-info {
+        display: flex;
+        align-items: center;
+      }
+
       .stat-count {
-        display: block;
         font-size: 1.15rem;
         font-weight: 700;
-        line-height: 1.1;
+        line-height: 1;
+        margin-bottom: 2px;
+        margin-right: 4px;
       }
       .stat-label {
         font-size: 0.65rem;
         color: var(--ion-color-medium);
       }
 
-      /* SEARCH BAR */
+      /* --- STICKY TOOLS (Tối ưu) --- */
+      .sticky-tools {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: rgba(var(--ion-background-color-rgb), 0.96);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        padding-top: 10px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid transparent;
+        transition: all 0.3s;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        /* PERFORMANCE: Báo trước trình duyệt */
+        will-change: position, transform;
+        transform: translateZ(0); /* Kích hoạt GPU */
+      }
+
       .custom-searchbar {
-        --background: var(--ion-color-step-50, #f2f2f7);
-        --color: var(--ion-text-color);
-        --placeholder-color: var(--ion-color-medium);
-        --icon-color: var(--ion-color-medium);
-        --border-radius: 12px;
+        --background: var(--ion-color-step-50, #f4f5f8);
+        --border-radius: 14px;
         --box-shadow: none;
         padding-inline: 0;
-        height: 46px;
+        height: 42px;
+        min-height: 42px;
       }
       :host-context(body.dark) .custom-searchbar {
         --background: var(--ion-color-step-100);
       }
-      .filter-indicator {
+
+      .filter-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--ion-color-primary);
+        color: var(--ion-color-primary-contrast);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
         margin-top: 10px;
+        cursor: pointer;
+        box-shadow: 0 4px 10px rgba(var(--ion-color-primary-rgb), 0.3);
       }
 
-      /* CONTENT */
-      .main-content {
-        --background: var(--ion-background-color);
+      .timeline-divider {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 14px;
       }
-      .list-spacer {
-        height: 16px;
+      .timeline-divider h3 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--ion-color-medium);
       }
+      .count-badge {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--ion-color-primary);
+        background: rgba(var(--ion-color-primary-rgb), 0.1);
+        padding: 4px 10px;
+        border-radius: 8px;
+      }
+
+      /* --- TIMELINE LIST --- */
       .timeline-list {
-        padding: 0 16px 80px 16px;
+        padding: 8px 16px 80px 16px;
         background: transparent;
       }
 
       .timeline-item {
         background: var(--ion-card-background);
         border-radius: 16px;
-        margin-bottom: 12px;
+        margin-bottom: 14px;
         position: relative;
         overflow: hidden;
         display: flex;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-        min-height: 90px;
-        border: 1px solid transparent;
-        transition: transform 0.1s;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        min-height: 85px;
+        border: 1px solid var(--ion-color-light-shade);
+        /* PERFORMANCE: Quan trọng cho list dài */
+        contain: content;
       }
       :host-context(body.dark) .timeline-item {
         border-color: var(--ion-color-step-100);
@@ -462,7 +482,7 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
       }
 
       .color-strip {
-        width: 5px;
+        width: 6px;
         flex-shrink: 0;
       }
       .item-content {
@@ -472,20 +492,22 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         flex-direction: column;
         justify-content: center;
       }
+
       .item-header {
         display: flex;
         justify-content: space-between;
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         font-weight: 700;
         text-transform: uppercase;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
       }
       .item-time {
         color: var(--ion-color-medium);
         font-weight: 500;
+        font-size: 0.75rem;
       }
       .item-context {
-        margin: 0 0 8px 0;
+        margin: 0 0 10px 0;
         font-size: 1rem;
         font-weight: 500;
         line-height: 1.5;
@@ -497,22 +519,21 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
       }
       .emotion-tag {
         font-size: 0.75rem;
-        color: var(--ion-color-medium);
+        color: var(--ion-color-dark);
         background: var(--ion-color-light);
         padding: 4px 10px;
         border-radius: 6px;
-        font-style: italic;
-        display: inline-block;
+        font-weight: 500;
       }
 
-      /* FIX: Nút FAB tránh thanh điều hướng */
+      /* FAB & EMPTY STATE */
       ion-fab[vertical='bottom'] {
-        bottom: calc(20px + var(--ion-safe-area-bottom));
+        bottom: 20px;
       }
       .custom-fab {
         --background: var(--ion-text-color);
         --color: var(--ion-background-color);
-        --box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
       }
 
       .empty-state {
@@ -532,12 +553,24 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         font-size: 32px;
         color: var(--ion-color-medium);
       }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-5px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .fade-in {
+        animation: fadeIn 0.3s ease-out;
+      }
     `,
   ],
 })
 export class HomePage implements OnInit, ViewWillEnter {
-  // Logic giữ nguyên
-  private router = inject(Router);
   private db = inject(DatabaseService);
   private modalCtrl = inject(ModalController);
   private lastLoadTime = 0;
@@ -578,7 +611,6 @@ export class HomePage implements OnInit, ViewWillEnter {
       timeOutline,
       searchOutline,
       statsChartOutline,
-      settingsOutline,
       documentTextOutline,
       happyOutline,
       filterOutline,
@@ -595,7 +627,6 @@ export class HomePage implements OnInit, ViewWillEnter {
 
   async ionViewWillEnter() {
     const now = Date.now();
-    // Nếu vừa load cách đây dưới 500ms thì bỏ qua (Debounce)
     if (now - this.lastLoadTime < 500) return;
     this.lastLoadTime = now;
     await this.loadData();
@@ -643,13 +674,6 @@ export class HomePage implements OnInit, ViewWillEnter {
     await this.loadData(false, ev);
   }
 
-  getGreeting() {
-    const hours = new Date().getHours();
-    if (hours < 12) return 'Chào buổi sáng';
-    if (hours < 18) return 'Chào buổi chiều';
-    return 'Chào buổi tối';
-  }
-
   getCountByType(type: SelfOpsEventType) {
     return this.events().filter((e) => e.type === type).length;
   }
@@ -694,9 +718,5 @@ export class HomePage implements OnInit, ViewWillEnter {
       componentProps: { events: allEvents },
     });
     await modal.present();
-  }
-
-  goToSettings() {
-    this.router.navigate(['/settings']);
   }
 }
