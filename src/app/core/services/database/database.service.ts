@@ -1,6 +1,5 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
-import { Platform } from '@ionic/angular/standalone';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { ONE_WEEK_MS, SelfOpsEvent } from '../../models/event.type';
@@ -20,13 +19,14 @@ const TABLE_NAME = 'events';
   providedIn: 'root',
 })
 export class DatabaseService {
-  private platform = inject(Platform);
-
   private sqlite: SQLiteConnection = new SQLiteConnection(CapacitorSQLite);
   private db!: SQLiteDBConnection;
 
   private isDbReady = new BehaviorSubject<boolean>(false);
   public dbReady$ = this.isDbReady.asObservable();
+
+  private pendingCount = new BehaviorSubject<number>(0);
+  public pendingCount$ = this.pendingCount.asObservable();
 
   constructor() {
     this.init();
@@ -102,13 +102,57 @@ export class DatabaseService {
       }
 
       this.isDbReady.next(true);
+      await this.updatePendingCount();
+      console.log('✅ Database Initialized & Count Updated');
     } catch (e) {
       console.error('❌ Database Init Error:', e);
     }
   }
 
-  // --- CRUD METHODS ---
+  async updatePendingCount() {
+    await this.ensureDbReady();
+    const now = Date.now();
+    let count = 0;
 
+    if (this.isWeb) {
+      // WEB: Lấy hết -> Filter thủ công
+      try {
+        const res = await CapacitorDataStorageSqlite.values();
+        const all = (res.values || [])
+          .map((v: string) => {
+            try {
+              return JSON.parse(v);
+            } catch {
+              return null;
+            }
+          })
+          .filter((e: any) => e !== null);
+
+        count = all.filter((e: any) => {
+          // Logic filter: Chưa review VÀ Đã đến hạn
+          const isNotReviewed = e.is_reviewed === false || e.is_reviewed === 0;
+          const isDue = e.review_due_date <= now;
+          return isNotReviewed && isDue;
+        }).length;
+      } catch (e) {
+        count = 0;
+      }
+    } else {
+      // NATIVE: Count bằng SQL cho nhanh
+      try {
+        const query = `SELECT COUNT(*) as c FROM ${TABLE_NAME} WHERE is_reviewed = 0 AND review_due_date <= ?`;
+        const res = await this.db.query(query, [now]);
+        count = res.values?.[0]?.c || 0;
+      } catch (e) {
+        count = 0;
+      }
+    }
+
+    // Emit giá trị mới ra cho toàn App biết
+    this.pendingCount.next(count);
+  }
+
+  // --- CRUD METHODS ---
   async addEvent(event: any) {
     await this.ensureDbReady();
 
@@ -153,6 +197,8 @@ export class DatabaseService {
         '',
       ]);
     }
+
+    await this.updatePendingCount();
   }
 
   async updateReflection(uuid: string, reflectionContent: string) {
@@ -193,6 +239,8 @@ export class DatabaseService {
     } else {
       await this.db.run(`DELETE FROM ${TABLE_NAME} WHERE uuid = ?`, [uuid]);
     }
+
+    await this.updatePendingCount();
   }
 
   async deleteAll() {
@@ -202,6 +250,8 @@ export class DatabaseService {
     } else {
       await this.db.run(`DELETE FROM ${TABLE_NAME}`);
     }
+
+    this.pendingCount.next(0);
   }
 
   // --- QUERY METHODS ---
@@ -309,6 +359,8 @@ export class DatabaseService {
       `;
       await this.db.run(query, [reflection, outcome, now, uuid]);
     }
+
+    await this.updatePendingCount();
   }
 
   async getPendingReviews(): Promise<SelfOpsEvent[]> {

@@ -369,6 +369,7 @@ export class AddEventModalComponent {
         emotion: this.eventData.emotion,
         is_reviewed: false,
         review_due_date: Date.now() + ONE_WEEK_MS, // Hẹn 7 ngày sau sẽ Review
+        // review_due_date: Date.now() - 60000, // DÒNG NÀY ĐỂ TEST
         created_at: Date.now(),
       };
 
