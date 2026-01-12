@@ -1,4 +1,5 @@
 import type { CapacitorConfig } from '@capacitor/cli';
+import { KeyboardResize, KeyboardStyle } from '@capacitor/keyboard';
 
 const config: CapacitorConfig = {
   appId: 'io.ionic.starter',
@@ -7,7 +8,6 @@ const config: CapacitorConfig = {
   backgroundColor: '#0f172a',
   plugins: {
     SplashScreen: {
-      // launchShowDuration: 2000, // Hiện trong 2 giây
       launchAutoHide: true, // Tự động tắt
       backgroundColor: '#0f172a', // Màu nền trùng khớp
       androidSplashResourceName: 'splash',
@@ -23,10 +23,8 @@ const config: CapacitorConfig = {
       iconColor: '#0f172a',
     },
     Keyboard: {
-      resize: 'ionic',
-      style: 'DARK',
-      // Giúp bàn phím hiện lên mượt hơn, không đẩy layout loạn xạ
-      resizeOnFullScreen: true,
+      resize: KeyboardResize.Ionic,
+      style: KeyboardStyle.Dark,
     },
   },
 };

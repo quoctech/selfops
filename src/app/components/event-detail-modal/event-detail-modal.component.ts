@@ -2,12 +2,18 @@ import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   Input,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  computed,
   inject,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-
+import { PluginListenerHandle } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 import {
   AlertController,
   IonBadge,
@@ -26,12 +32,12 @@ import {
   IonTitle,
   IonToolbar,
   ModalController,
+  Platform,
 } from '@ionic/angular/standalone';
-
 import { addIcons } from 'ionicons';
 import {
   bulbOutline,
-  checkmarkCircleOutline, // 👈 Import icon mới
+  checkmarkCircleOutline,
   closeOutline,
   heartOutline,
   helpBuoyOutline,
@@ -39,7 +45,6 @@ import {
   timeOutline,
   trashOutline,
 } from 'ionicons/icons';
-
 import { SelfOpsEvent } from 'src/app/core/models/event.type';
 import { DatabaseService } from 'src/app/core/services/database/database.service';
 import { AppUtils } from 'src/app/core/utils/app.utils';
@@ -86,36 +91,33 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
       </ion-toolbar>
     </ion-header>
 
-    <ion-content class="ion-padding">
-      @if (eventSignal(); as evt) { @let config = getEventConfig(evt.type);
-
+    <ion-content class="ion-padding" #content>
+      @if (viewState(); as state) {
       <ion-card class="read-only-card">
         <ion-card-header>
           <div class="card-meta">
-            <ion-badge [color]="config.color" mode="ios">
+            <ion-badge [color]="state.config.color" mode="ios">
               <ion-icon
-                [name]="config.icon"
+                [name]="state.config.icon"
                 style="margin-right: 4px;"
               ></ion-icon>
-              {{ config.label }}
+              {{ state.config.label }}
             </ion-badge>
 
             <span class="date-text">
               <ion-icon name="time-outline"></ion-icon>
-              {{ evt.created_at | date : 'short' }}
+              {{ state.originalEvent.created_at | date : 'short' }}
             </span>
           </div>
         </ion-card-header>
 
         <ion-card-content>
           <p class="context-label">Bạn đã quyết định/suy nghĩ:</p>
-          <p class="context-text">
-            {{ evt.context }}
-          </p>
+          <p class="context-text">{{ state.originalEvent.context }}</p>
 
-          @if (evt.emotion) {
+          @if (state.emotions.length > 0) {
           <div class="emotion-container">
-            @for (emo of parseEmotions(evt.emotion); track emo) {
+            @for (emo of state.emotions; track emo) {
             <ion-chip outline color="medium" class="mini-chip">
               <ion-label>{{ emo }}</ion-label>
             </ion-chip>
@@ -126,7 +128,7 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
       </ion-card>
       }
 
-      <div class="input-section">
+      <div class="input-section" #outcomeSection>
         <div class="section-header">
           <ion-icon name="checkmark-circle-outline" color="success"></ion-icon>
           <h3>Kết quả thực tế</h3>
@@ -140,14 +142,15 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
             [ngModel]="actualOutcome()"
             (ngModelChange)="actualOutcome.set($event)"
             rows="3"
-            placeholder="Ví dụ: Kết quả tốt hơn mình nghĩ, khách hàng đã đồng ý..."
+            placeholder="Ví dụ: Kết quả tốt hơn mình nghĩ..."
             class="custom-textarea"
             [autoGrow]="true"
+            (ionFocus)="setCurrentFocus('outcome')"
           ></ion-textarea>
         </div>
       </div>
 
-      <div class="input-section ion-margin-top">
+      <div class="input-section ion-margin-top" #reflectionSection>
         <div class="section-header">
           <ion-icon name="bulb-outline" color="warning"></ion-icon>
           <h3>Góc nhìn lại</h3>
@@ -165,6 +168,7 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
             placeholder="Ví dụ: Lần sau mình sẽ kiểm tra kỹ hơn..."
             class="custom-textarea"
             [autoGrow]="true"
+            (ionFocus)="setCurrentFocus('reflection')"
           ></ion-textarea>
         </div>
       </div>
@@ -181,22 +185,23 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         <ion-icon name="save-outline" slot="start"></ion-icon>
         Hoàn tất Review }
       </ion-button>
+
+      <div class="keyboard-spacer"></div>
     </ion-content>
   `,
   styles: [
     `
-      /* Card hiển thị thông tin cũ */
+      /* === OPTIMIZED CSS === */
+
+      /* 1. READ ONLY CARD */
       .read-only-card {
         margin: 0 0 24px 0;
         background: var(--ion-color-light);
         box-shadow: none;
         border-radius: 16px;
         border: 1px solid var(--ion-color-light-shade);
-      }
-
-      :host-context(body.dark) .read-only-card {
-        background: var(--ion-color-step-100);
-        border-color: var(--ion-color-step-200);
+        /* Performance: Tách layer render riêng biệt */
+        contain: content;
       }
 
       .card-meta {
@@ -237,14 +242,13 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         padding-top: 12px;
         border-top: 1px dashed var(--ion-color-medium-shade);
       }
-
       .mini-chip {
         height: 24px;
         font-size: 0.8rem;
         margin: 0;
       }
 
-      /* Phần Input Section */
+      /* 2. INPUT SECTIONS */
       .input-section {
         padding: 0 4px;
       }
@@ -255,7 +259,6 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         gap: 8px;
         margin-bottom: 4px;
       }
-
       .section-header h3 {
         margin: 0;
         font-size: 1.1rem;
@@ -276,11 +279,13 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         border-radius: 12px;
         padding: 8px 16px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        /* Performance: Tối ưu paint */
+        contain: layout paint;
       }
-
-      :host-context(body.dark) .input-wrapper {
-        background: var(--ion-color-step-50);
-        border-color: var(--ion-color-step-150);
+      .input-wrapper:focus-within {
+        border-color: var(--ion-color-primary);
+        box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.1);
       }
 
       .custom-textarea {
@@ -292,28 +297,69 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         --border-radius: 12px;
         height: 48px;
         font-weight: 600;
-        margin-bottom: 40px; /* Thêm khoảng trống dưới cùng */
+        margin-bottom: 40px;
+      }
+
+      .keyboard-spacer {
+        height: 300px;
+        pointer-events: none;
+      }
+
+      /* 3. DARK MODE GROUPED */
+      :host-context(body.dark) {
+        .read-only-card {
+          background: var(--ion-color-step-100);
+          border-color: var(--ion-color-step-200);
+        }
+        .input-wrapper {
+          background: var(--ion-color-step-50);
+          border-color: var(--ion-color-step-150);
+        }
       }
     `,
   ],
 })
-export class EventDetailModalComponent {
-  // Signals
-  protected eventSignal = signal<SelfOpsEvent | null>(null);
+export class EventDetailModalComponent implements OnInit, OnDestroy {
+  // --- STATE ---
+  private eventSignal = signal<SelfOpsEvent | null>(null);
+
+  // Computed View State: Tính toán 1 lần duy nhất khi input thay đổi
+  // Giúp template render cực nhanh, không gọi hàm lặp đi lặp lại.
+  protected viewState = computed(() => {
+    const evt = this.eventSignal();
+    if (!evt) return null;
+
+    return {
+      originalEvent: evt,
+      config: AppUtils.getTypeConfig(evt.type),
+      emotions: AppUtils.parseEmotions(evt.emotion || ''),
+    };
+  });
+
+  // Editable Signals
   protected reflectionNote = signal('');
-  protected actualOutcome = signal(''); // Signal mới cho Kết quả thực tế
+  protected actualOutcome = signal('');
   protected isSaving = signal(false);
+
+  // Logic Focus Keyboard
+  private currentFocus: 'outcome' | 'reflection' | null = null;
+
+  @ViewChild('content') content!: IonContent;
+  @ViewChild('outcomeSection', { read: ElementRef }) outcomeEl!: ElementRef;
+  @ViewChild('reflectionSection', { read: ElementRef })
+  reflectionEl!: ElementRef;
 
   @Input() set event(val: SelfOpsEvent) {
     this.eventSignal.set(val);
     this.reflectionNote.set(val.reflection || '');
-    // Load outcome cũ lên (nếu có)
     this.actualOutcome.set(val.actual_outcome || '');
   }
 
   private modalCtrl = inject(ModalController);
   private db = inject(DatabaseService);
   private alertCtrl = inject(AlertController);
+  private platform = inject(Platform);
+  private keyboardListener: PluginListenerHandle | undefined;
 
   constructor() {
     addIcons({
@@ -328,15 +374,44 @@ export class EventDetailModalComponent {
     });
   }
 
-  getEventConfig(type: string) {
-    return AppUtils.getTypeConfig(type);
+  ngOnInit() {
+    if (this.platform.is('capacitor')) {
+      this.initKeyboardLogic();
+    }
   }
 
-  parseEmotions(emoStr: string | string[]) {
-    // Fix nhỏ: Đảm bảo tương thích nếu emotion đã là mảng
-    if (Array.isArray(emoStr)) return emoStr;
-    return AppUtils.parseEmotions(emoStr);
+  ngOnDestroy() {
+    if (this.keyboardListener) this.keyboardListener.remove();
   }
+
+  // --- KEYBOARD LOGIC ---
+  async initKeyboardLogic() {
+    this.keyboardListener = await Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        this.scrollToFocusedInput();
+      }
+    );
+    await Keyboard.setAccessoryBarVisible({ isVisible: true });
+  }
+
+  setCurrentFocus(section: 'outcome' | 'reflection') {
+    this.currentFocus = section;
+  }
+
+  scrollToFocusedInput() {
+    if (!this.currentFocus) return;
+
+    const targetEl =
+      this.currentFocus === 'outcome'
+        ? this.outcomeEl.nativeElement
+        : this.reflectionEl.nativeElement;
+
+    // Scroll section lên sát mép trên (cách 10px)
+    const y = targetEl.offsetTop - 10;
+    this.content.scrollToPoint(0, y, 300);
+  }
+  // ----------------------
 
   close() {
     return this.modalCtrl.dismiss(null, 'cancel');
@@ -347,15 +422,12 @@ export class EventDetailModalComponent {
     if (!evt) return;
 
     this.isSaving.set(true);
-
     try {
-      // Gọi hàm updateReview trong DatabaseService
       await this.db.updateReview(
         evt.uuid,
         this.reflectionNote(),
-        this.actualOutcome() // Truyền thêm kết quả thực tế
+        this.actualOutcome()
       );
-
       await this.modalCtrl.dismiss(true, 'saved');
     } catch (e) {
       console.error(e);
@@ -370,11 +442,7 @@ export class EventDetailModalComponent {
       message:
         'Bạn có chắc muốn xóa dòng nhật ký này không? Hành động này không thể hoàn tác.',
       buttons: [
-        {
-          text: 'Giữ lại',
-          role: 'cancel',
-          cssClass: 'secondary',
-        },
+        { text: 'Giữ lại', role: 'cancel', cssClass: 'secondary' },
         {
           text: 'Xóa luôn',
           role: 'destructive',

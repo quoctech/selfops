@@ -89,7 +89,7 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
         <div class="input-area">
           <ion-textarea
             [(ngModel)]="reason"
-            placeholder="Lý do chính là gì? (Ngắn gọn...)"
+            placeholder="Điều gì làm nên ngày hôm nay?"
             rows="1"
             [autoGrow]="true"
             class="reason-input"
@@ -201,7 +201,7 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
       .submit-btn {
         margin: 0;
         height: 48px;
-        width: 80px;
+        width: 70px;
         font-weight: 700;
         --border-radius: 16px;
         --box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.3);
