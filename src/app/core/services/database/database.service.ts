@@ -5,14 +5,12 @@ import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { SelfOpsEvent } from '../../models/event.type';
 
-// Import cho Native (SQLite chuẩn)
 import {
   CapacitorSQLite,
   SQLiteConnection,
   SQLiteDBConnection,
 } from '@capacitor-community/sqlite';
 
-// Import cho Web (Key-Value Store nhẹ)
 import { CapgoCapacitorDataStorageSqlite as CapacitorDataStorageSqlite } from '@capgo/capacitor-data-storage-sqlite';
 
 const DB_NAME = 'self_ops_db';
@@ -24,11 +22,9 @@ const TABLE_NAME = 'events';
 export class DatabaseService {
   private platform = inject(Platform);
 
-  // Native SQL Connection
   private sqlite: SQLiteConnection = new SQLiteConnection(CapacitorSQLite);
   private db!: SQLiteDBConnection;
 
-  // Trạng thái DB
   private isDbReady = new BehaviorSubject<boolean>(false);
   public dbReady$ = this.isDbReady.asObservable();
 
@@ -36,12 +32,10 @@ export class DatabaseService {
     this.init();
   }
 
-  // Helper check platform
   private get isWeb(): boolean {
     return Capacitor.getPlatform() === 'web';
   }
 
-  // Bảo vệ: Đợi DB Ready trước khi thực hiện bất kỳ lệnh nào
   private async ensureDbReady() {
     if (this.isDbReady.value) return;
     await firstValueFrom(this.dbReady$.pipe(filter((ready) => ready === true)));
@@ -50,23 +44,22 @@ export class DatabaseService {
   async init() {
     try {
       if (this.isWeb) {
-        // --- 1. LOGIC CHO WEB (Key-Value qua CapGo) ---
-        // Không cần WASM, dùng IndexedDB
+        // --- 1. WEB ---
         await CapacitorDataStorageSqlite.openStore({
           database: DB_NAME,
           table: TABLE_NAME,
           encrypted: false,
           mode: 'no-encryption',
         });
-        console.log('✅ WEB DB Ready (CapGo KV Mode)');
+        console.log('✅ WEB DB Ready');
       } else {
-        // --- 2. LOGIC CHO NATIVE (SQLite chuẩn) ---
-        await this.sqlite.checkConnectionsConsistency();
-        const isExists = await this.sqlite.isConnection(DB_NAME, false);
+        // --- 2. NATIVE (Fix lỗi Connection Exists) ---
 
-        if (isExists.result) {
-          this.db = await this.sqlite.retrieveConnection(DB_NAME, false);
-        } else {
+        // Kiểm tra xem native có đang giữ kết nối nào không
+        await this.sqlite.checkConnectionsConsistency();
+
+        try {
+          // Cố gắng tạo kết nối mới
           this.db = await this.sqlite.createConnection(
             DB_NAME,
             false,
@@ -74,31 +67,38 @@ export class DatabaseService {
             1,
             false
           );
+        } catch (err: any) {
+          // Nếu lỗi báo "Connection exists" -> Lấy lại kết nối cũ
+          if (err.message && err.message.includes('already exists')) {
+            console.warn('⚠️ Connection exists, retrieving...');
+            this.db = await this.sqlite.retrieveConnection(DB_NAME, false);
+          } else {
+            // Nếu là lỗi khác thì ném ra
+            throw err;
+          }
         }
 
         await this.db.open();
 
-        // Tạo bảng SQL (Sử dụng trường 'reflection')
+        // Tạo bảng (Lưu ý: Chỉ chạy nếu bảng chưa tồn tại. Nếu bảng cũ thiếu cột, cần gỡ app cài lại)
         const schema = `
           CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             uuid TEXT UNIQUE NOT NULL,
             type TEXT NOT NULL,
             context TEXT,
-            tags TEXT,           -- Lưu JSON String
-            meta_data TEXT,      -- Lưu JSON String
+            tags TEXT,
+            meta_data TEXT,
             is_reviewed INTEGER DEFAULT 0,
             review_due_date INTEGER,
-            
-            reflection TEXT,     -- ✅ Đã sửa tên cột theo yêu cầu
-            
+            reflection TEXT, 
             actual_outcome TEXT,
             created_at INTEGER,
             updated_at INTEGER
           );
         `;
         await this.db.execute(schema);
-        console.log('✅ NATIVE DB Ready (SQLite Mode)');
+        console.log('✅ NATIVE DB Ready');
       }
 
       this.isDbReady.next(true);
@@ -107,7 +107,7 @@ export class DatabaseService {
     }
   }
 
-  // --- CRUD METHODS (Hybrid Logic) ---
+  // --- CRUD METHODS ---
 
   async addEvent(event: any) {
     await this.ensureDbReady();
@@ -116,7 +116,6 @@ export class DatabaseService {
     const now = Date.now();
     const dueDate = event.review_due_date || now + 7 * 24 * 60 * 60 * 1000;
 
-    // Chuẩn bị dữ liệu cho Native
     const tagsStr = JSON.stringify(event.tags || []);
     const metaStr =
       typeof event.meta_data === 'string'
@@ -124,7 +123,6 @@ export class DatabaseService {
         : JSON.stringify(event.meta_data || {});
 
     if (this.isWeb) {
-      // WEB: Lưu Object JSON vào Key-Value
       const newEvent = {
         ...event,
         uuid,
@@ -133,20 +131,17 @@ export class DatabaseService {
         is_reviewed: false,
         tags: event.tags || [],
         meta_data: event.meta_data || {},
-        reflection: '', // Khởi tạo rỗng
+        reflection: '',
       };
-
       await CapacitorDataStorageSqlite.set({
         key: uuid,
         value: JSON.stringify(newEvent),
       });
     } else {
-      // NATIVE: Chạy SQL INSERT
       const query = `
         INSERT INTO ${TABLE_NAME} (uuid, type, context, tags, meta_data, created_at, review_due_date, reflection) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `;
-      // Lưu ý: params phải khớp thứ tự
       await this.db.run(query, [
         uuid,
         event.type,
@@ -163,40 +158,31 @@ export class DatabaseService {
   async updateReflection(uuid: string, reflectionContent: string) {
     await this.ensureDbReady();
     const now = Date.now();
-    console.log(`🔄 Updating Reflection for ${uuid}`);
 
     if (this.isWeb) {
-      // WEB: Get -> Parse -> Modify -> Set
       try {
         const res = await CapacitorDataStorageSqlite.get({ key: uuid });
         if (res && res.value) {
           const evt = JSON.parse(res.value);
-
-          // Cập nhật trường 'reflection'
           evt.reflection = reflectionContent;
           evt.updated_at = now;
-          evt.is_reviewed = true; // Đánh dấu đã review
-
+          evt.is_reviewed = true;
           await CapacitorDataStorageSqlite.set({
             key: uuid,
             value: JSON.stringify(evt),
           });
-          console.log('✅ Web Update Success');
-        } else {
-          console.warn('⚠️ Key not found on Web Store');
         }
       } catch (err) {
         console.error('❌ Web Update Error', err);
       }
     } else {
-      // NATIVE: SQL UPDATE
+      // NATIVE
       const query = `
         UPDATE ${TABLE_NAME} 
         SET reflection = ?, is_reviewed = 1, updated_at = ? 
         WHERE uuid = ?
       `;
       await this.db.run(query, [reflectionContent, now, uuid]);
-      console.log('✅ Native Update Success');
     }
   }
 
@@ -227,7 +213,6 @@ export class DatabaseService {
     await this.ensureDbReady();
 
     if (this.isWeb) {
-      // WEB: Lấy tất cả -> Sort JS -> Slice (Pagination giả lập)
       try {
         const res = await CapacitorDataStorageSqlite.values();
         const allEvents = (res.values || [])
@@ -244,18 +229,16 @@ export class DatabaseService {
         const start = page * pageSize;
         return allEvents.slice(start, start + pageSize);
       } catch (e) {
-        console.error('Web Paging Error', e);
         return [];
       }
     } else {
-      // NATIVE: SQL Limit/Offset (Hiệu năng cao)
       const offset = page * pageSize;
       const query = `SELECT * FROM ${TABLE_NAME} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
       try {
         const res = await this.db.query(query, [pageSize, offset]);
         return (res.values || []).map((item) => ({
           ...item,
-          is_reviewed: !!item.is_reviewed, // Convert 0/1 -> boolean
+          is_reviewed: !!item.is_reviewed,
         })) as SelfOpsEvent[];
       } catch (e) {
         return [];
