@@ -4,6 +4,7 @@
   "author": "Ionic Framework",
   "homepage": "https://ionicframework.com/",
   "scripts": {
+    "dev": "chmod +x ./dev.sh && ./dev.sh",
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
