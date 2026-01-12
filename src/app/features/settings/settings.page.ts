@@ -542,7 +542,6 @@ export class SettingsPage implements OnInit {
     this.isProcessing.set(true);
     this.actionType.set('DELETE');
     try {
-      await new Promise((r) => setTimeout(r, 800));
       await this.db.deleteAll();
       await this.showToast('Đã xóa sạch dữ liệu.', 'success');
       this.navCtrl.navigateRoot('/home');

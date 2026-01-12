@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { ViewWillEnter } from '@ionic/angular';
 
 import { addIcons } from 'ionicons';
 import {
@@ -534,11 +535,12 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
     `,
   ],
 })
-export class HomePage implements OnInit {
+export class HomePage implements OnInit, ViewWillEnter {
   // Logic giữ nguyên
   private router = inject(Router);
   private db = inject(DatabaseService);
   private modalCtrl = inject(ModalController);
+  private lastLoadTime = 0;
 
   events = signal<SelfOpsEvent[]>([]);
   currentPage = 0;
@@ -589,6 +591,14 @@ export class HomePage implements OnInit {
     this.db.dbReady$.subscribe((isReady) => {
       if (isReady) this.loadData(true);
     });
+  }
+
+  async ionViewWillEnter() {
+    const now = Date.now();
+    // Nếu vừa load cách đây dưới 500ms thì bỏ qua (Debounce)
+    if (now - this.lastLoadTime < 500) return;
+    this.lastLoadTime = now;
+    await this.loadData();
   }
 
   async handleRefresh(event: any) {
