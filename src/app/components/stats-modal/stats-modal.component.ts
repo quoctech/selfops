@@ -70,12 +70,8 @@ const COLOR_MAP: Record<string, string> = {
           getEventConfig(type); @let colorVar = getColorVar(type);
 
           <div class="legend-card">
-            <div
-              class="legend-icon"
-              [style.background]="'var(--ion-color-' + config.color + '-tint)'"
-              [style.color]="colorVar"
-            >
-              <ion-icon [name]="config.icon"></ion-icon>
+            <div class="legend-icon" [style.background]="colorVar">
+              <ion-icon [name]="config.icon" style="color: #ffffff;"></ion-icon>
             </div>
 
             <div class="legend-info">
@@ -207,7 +203,7 @@ const COLOR_MAP: Record<string, string> = {
         margin-top: 4px;
       }
 
-      /* 👇 LEGEND GRID (NEW DESIGN) */
+      /* LEGEND GRID (NEW DESIGN) */
       .legend-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -356,6 +352,12 @@ export class StatsModalComponent implements OnInit, OnDestroy {
     this.animateChart();
   }
 
+  ngOnDestroy() {
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+  }
+
   animateChart() {
     const duration = 1200;
     const startTime = performance.now();
@@ -459,8 +461,4 @@ export class StatsModalComponent implements OnInit, OnDestroy {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
   });
-
-  ngOnDestroy() {
-    if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
-  }
 }
