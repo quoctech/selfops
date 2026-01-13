@@ -380,7 +380,14 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
         this.content.scrollToPoint(0, y, 300);
       }
     );
-    await Keyboard.setAccessoryBarVisible({ isVisible: true });
+
+    if (this.platform.is('ios')) {
+      try {
+        await Keyboard.setAccessoryBarVisible({ isVisible: true });
+      } catch (e) {
+        console.warn('Keyboard accessory bar error', e);
+      }
+    }
   }
 
   async onTypeChange(ev: any) {
