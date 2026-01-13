@@ -11,10 +11,14 @@ import { FormsModule } from '@angular/forms';
 import {
   AlertController,
   IonButton,
+  IonCard,
+  IonCardContent,
+  IonCardHeader,
   IonContent,
   IonDatetime,
   IonHeader,
   IonIcon,
+  IonInput,
   IonItem,
   IonLabel,
   IonList,
@@ -34,6 +38,8 @@ import {
   closeOutline,
   cloudDownloadOutline,
   codeSlashOutline,
+  constructOutline, // Dev mode
+  hammerOutline, // Dev mode
   moonOutline,
   notificationsOutline,
   shieldCheckmarkOutline,
@@ -41,7 +47,7 @@ import {
   trashBinOutline,
 } from 'ionicons/icons';
 
-import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { Preferences } from '@capacitor/preferences';
 import { Share } from '@capacitor/share';
 import { DatabaseService } from 'src/app/core/services/database/database.service';
@@ -68,6 +74,10 @@ import { NotificationService } from 'src/app/core/services/notification.service'
     IonSpinner,
     IonDatetime,
     IonModal,
+    IonCard, // Dev mode
+    IonCardHeader,
+    IonCardContent,
+    IonInput, // Dev Zone
   ],
   template: `
     <ion-header [translucent]="true" class="ion-padding ion-no-border">
@@ -174,16 +184,61 @@ import { NotificationService } from 'src/app/core/services/notification.service'
         </ion-item>
       </ion-list>
 
+      @if (isDevMode()) {
+      <div class="dev-zone">
+        <ion-card class="dev-card">
+          <ion-card-header>
+            <div class="dev-header">
+              <ion-icon name="construct-outline"></ion-icon>
+              <ion-label>Developer Zone</ion-label>
+            </div>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-item lines="none" class="dev-input-item">
+              <ion-label position="stacked">Số lượng Fake Data</ion-label>
+              <ion-input
+                type="number"
+                placeholder="VD: 50"
+                [(ngModel)]="dummyCount"
+              ></ion-input>
+            </ion-item>
+
+            <ion-button
+              expand="block"
+              color="dark"
+              class="ion-margin-top"
+              (click)="generateDummyData()"
+              [disabled]="isProcessing()"
+            >
+              @if(isProcessing() && actionType() === 'SEED') {
+              <ion-spinner name="dots"></ion-spinner>
+              } @else {
+              <ion-icon name="hammer-outline" slot="start"></ion-icon>
+              Sinh dữ liệu giả }
+            </ion-button>
+          </ion-card-content>
+        </ion-card>
+      </div>
+      }
+
       <div class="footer-info">
         <div class="app-logo">
           <ion-icon name="code-slash-outline"></ion-icon>
         </div>
         <h3 class="app-name">SelfOps</h3>
-        <div class="meta-info">
+
+        <div
+          class="meta-info noselect"
+          (touchstart)="startPress()"
+          (touchend)="endPress()"
+          (mousedown)="startPress()"
+          (mouseup)="endPress()"
+        >
           <span>v1.2.0</span>
           <span class="dot">•</span>
           <span>Build 2026.01</span>
         </div>
+
         <p class="copyright">© 2026 SelfOps Inc.</p>
       </div>
 
@@ -221,15 +276,13 @@ import { NotificationService } from 'src/app/core/services/notification.service'
   `,
   styles: [
     `
-      /* Background xử lý Dark Mode tự động */
+      /* ... Các style cũ giữ nguyên ... */
       .settings-content {
         --background: var(--ion-color-step-50, #f2f2f7);
       }
       :host-context(body.dark) .settings-content {
         --background: #000000;
       }
-
-      /* ICON BOXES - iOS Style */
       .icon-box {
         width: 32px;
         height: 32px;
@@ -241,7 +294,6 @@ import { NotificationService } from 'src/app/core/services/notification.service'
         color: white;
         font-size: 18px;
       }
-      /* Màu sắc chuẩn iOS */
       .icon-box.purple {
         background-color: #5856d6;
       }
@@ -258,7 +310,6 @@ import { NotificationService } from 'src/app/core/services/notification.service'
         background-color: #32ade6;
       }
 
-      /* Time Badge */
       .time-badge {
         background: var(--ion-color-step-150, #e3e3e3);
         color: var(--ion-text-color);
@@ -266,7 +317,6 @@ import { NotificationService } from 'src/app/core/services/notification.service'
         border-radius: 8px;
         font-weight: 600;
         font-size: 0.95rem;
-        transition: background 0.2s;
       }
 
       /* Modal Styling */
@@ -326,7 +376,14 @@ import { NotificationService } from 'src/app/core/services/notification.service'
         display: flex;
         align-items: center;
         gap: 6px;
+        user-select: none;
+        cursor: pointer;
+        padding: 10px;
       }
+      .meta-info:active {
+        opacity: 0.5;
+      }
+
       .dot {
         font-weight: bold;
       }
@@ -343,6 +400,44 @@ import { NotificationService } from 'src/app/core/services/notification.service'
         margin-bottom: 4px;
         color: var(--ion-color-medium);
       }
+
+      /* DEV ZONE STYLES */
+      .dev-zone {
+        padding: 0 16px;
+        animation: slideIn 0.3s ease-out;
+      }
+      .dev-card {
+        border: 2px dashed var(--ion-color-medium);
+        box-shadow: none;
+        background: transparent;
+        margin-top: 20px;
+      }
+      .dev-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--ion-color-dark);
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+      }
+      .dev-input-item {
+        border: 1px solid var(--ion-color-medium);
+        border-radius: 8px;
+        margin-bottom: 10px;
+        --background: transparent;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
     `,
   ],
 })
@@ -355,14 +450,18 @@ export class SettingsPage implements OnInit {
   // States
   isDarkMode = signal(false);
   isProcessing = signal(false);
-  actionType = signal<'EXPORT' | 'DELETE' | null>(null);
+  actionType = signal<'EXPORT' | 'DELETE' | 'SEED' | null>(null);
 
   // Notification States
   notificationEnabled = signal(false);
-  selectedTime = signal({ hour: 21, minute: 0 }); // Giờ chính thức
-  tempTime = signal({ hour: 21, minute: 0 }); // Giờ tạm (trong modal)
-
+  selectedTime = signal({ hour: 21, minute: 0 });
+  tempTime = signal({ hour: 21, minute: 0 });
   isTimeModalOpen = signal(false);
+
+  // DEV MODE States
+  isDevMode = signal(false);
+  dummyCount = 50;
+  private pressTimer: any;
 
   // Computed
   displayTime = computed(() => {
@@ -371,7 +470,6 @@ export class SettingsPage implements OnInit {
     return `${h}:${m}`;
   });
 
-  // ISO String cho DateTime Picker (Dùng giờ tạm)
   tempIsoTime = computed(() => {
     const d = new Date();
     d.setHours(this.tempTime().hour);
@@ -391,13 +489,14 @@ export class SettingsPage implements OnInit {
       timeOutline,
       closeOutline,
       checkmarkOutline,
+      constructOutline,
+      hammerOutline,
     });
   }
 
   async ngOnInit() {
     this.checkTheme();
 
-    // Load Settings
     const settings = await this.notiService.getSettings();
     this.notificationEnabled.set(settings.isEnabled);
     this.selectedTime.set({ hour: settings.hour, minute: settings.minute });
@@ -405,9 +504,64 @@ export class SettingsPage implements OnInit {
 
     const { value } = await Preferences.get({ key: 'theme_dark_mode' });
     this.isDarkMode.set(value === 'true');
+
+    // Check nếu đã từng bật Dev mode thì bật luôn (Optional)
+    const devPref = await Preferences.get({ key: 'dev_mode_enabled' });
+    if (devPref.value === 'true') {
+      this.isDevMode.set(true);
+    }
   }
 
-  // --- THEME ---
+  // --- LOGIC LONG PRESS (ẤN GIỮ) ---
+  startPress() {
+    this.pressTimer = setTimeout(async () => {
+      await this.activateDevMode();
+    }, 1500);
+  }
+
+  endPress() {
+    // Nếu thả tay ra trước 1.5s thì hủy timer
+    if (this.pressTimer) {
+      clearTimeout(this.pressTimer);
+      this.pressTimer = null;
+    }
+  }
+
+  async activateDevMode() {
+    // Nếu đã bật rồi thì thôi (hoặc có thể làm logic tắt)
+    if (this.isDevMode()) return;
+
+    this.isDevMode.set(true);
+
+    await Haptics.notification({ type: NotificationType.Success });
+    this.showToast('🔓 Đã mở khóa Developer Zone!', 'success');
+    // Lưu lại trạng thái để lần sau vào app vẫn còn
+    await Preferences.set({ key: 'dev_mode_enabled', value: 'true' });
+  }
+
+  // --- LOGIC DEV ZONE ---
+  async generateDummyData() {
+    if (this.dummyCount <= 0) return;
+
+    this.isProcessing.set(true);
+    this.actionType.set('SEED');
+
+    try {
+      await this.db.seedDummyData(this.dummyCount);
+
+      await Haptics.notification({ type: NotificationType.Success });
+      this.showToast(`✅ Đã sinh ${this.dummyCount} sự kiện giả!`, 'success');
+    } catch (e) {
+      console.error(e);
+      this.showToast('Lỗi khi tạo data', 'danger');
+    } finally {
+      this.isProcessing.set(false);
+      this.actionType.set(null);
+    }
+  }
+
+  // --- CÁC LOGIC CŨ ---
+
   checkTheme() {
     const hasDarkClass = document.body.classList.contains('dark');
     const prefersDark = window.matchMedia(
@@ -420,7 +574,6 @@ export class SettingsPage implements OnInit {
     const isDark = ev.detail.checked;
     this.isDarkMode.set(isDark);
     document.body.classList.toggle('dark', isDark);
-
     await Preferences.set({
       key: 'theme_dark_mode',
       value: isDark ? 'true' : 'false',
@@ -428,14 +581,12 @@ export class SettingsPage implements OnInit {
     Haptics.impact({ style: ImpactStyle.Light });
   }
 
-  // --- NOTIFICATION ---
   async toggleNotification(ev: any) {
     const isChecked = ev.detail.checked;
     this.notificationEnabled.set(isChecked);
     Haptics.impact({ style: ImpactStyle.Light });
 
     if (isChecked) {
-      // Bật lại thì dùng giờ đang lưu
       await this.notiService.scheduleDailyReminder(
         this.selectedTime().hour,
         this.selectedTime().minute
@@ -447,9 +598,7 @@ export class SettingsPage implements OnInit {
     }
   }
 
-  // --- MODAL LOGIC (Tối ưu) ---
   openTimeModal() {
-    // Reset giờ tạm về giờ chính thức mỗi khi mở modal
     this.tempTime.set(this.selectedTime());
     this.isTimeModalOpen.set(true);
   }
@@ -458,13 +607,11 @@ export class SettingsPage implements OnInit {
     this.isTimeModalOpen.set(false);
   }
 
-  // Chỉ cập nhật biến tạm khi quay bánh xe (Performance Fix)
   onTimePickerChange(ev: any) {
     const date = new Date(ev.detail.value);
     this.tempTime.set({ hour: date.getHours(), minute: date.getMinutes() });
   }
 
-  // Chỉ lưu và đặt lịch khi bấm nút Xác nhận
   async confirmTimeChange() {
     const newTime = this.tempTime();
     this.selectedTime.set(newTime);
@@ -482,7 +629,6 @@ export class SettingsPage implements OnInit {
   async exportData() {
     this.isProcessing.set(true);
     this.actionType.set('EXPORT');
-
     try {
       const data = await this.db.getAllEvents();
       if (!data || data.length === 0) {
@@ -528,7 +674,6 @@ export class SettingsPage implements OnInit {
     try {
       await this.db.deleteAll();
       await this.showToast('Đã xóa sạch dữ liệu.', 'success');
-      // Không cần navigate vì đang ở tab Settings
     } catch (error) {
       this.showToast('Lỗi khi xóa dữ liệu.', 'danger');
     } finally {
@@ -548,7 +693,6 @@ export class SettingsPage implements OnInit {
       position: 'top',
       icon: color === 'success' ? 'shield-checkmark-outline' : undefined,
     });
-
     await toast.present();
   }
 }

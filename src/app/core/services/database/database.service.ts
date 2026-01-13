@@ -2,7 +2,11 @@ import { Injectable } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { filter } from 'rxjs/operators';
-import { ONE_WEEK_MS, SelfOpsEvent } from '../../models/event.type';
+import {
+  ONE_WEEK_MS,
+  SelfOpsEvent,
+  SelfOpsEventType,
+} from '../../models/event.type';
 
 import {
   CapacitorSQLite,
@@ -14,6 +18,30 @@ import { CapgoCapacitorDataStorageSqlite as CapacitorDataStorageSqlite } from '@
 import { AppUtils } from '../../utils/app.utils';
 
 const DB_NAME = 'self_ops_db';
+
+const SAMPLE_CONTEXTS = [
+  'Deploy production bị lỗi CSS',
+  'Quyết định refactor lại module User',
+  'Tranh luận với PM về tính năng mới',
+  'Quên backup database trước khi update',
+  'Tìm ra giải pháp fix bug memory leak',
+  'Review code của junior và phát hiện lỗi bảo mật',
+  'Họp team chốt phương án marketing',
+  'Server bị quá tải do lượng request tăng đột biến',
+  'Được khách hàng khen ngợi về giao diện mới',
+  'Lỡ tay xóa nhầm config file quan trọng',
+];
+
+const SAMPLE_EMOTIONS = [
+  'Lo lắng',
+  'Tức giận',
+  'Hào hứng',
+  'Mệt mỏi',
+  'Tự tin',
+  'Vội vàng',
+  'Buồn',
+  'Biết ơn',
+];
 
 @Injectable({
   providedIn: 'root',
@@ -265,6 +293,7 @@ export class DatabaseService {
       await CapacitorDataStorageSqlite.clear();
     } else {
       await this.db.run('DELETE FROM events');
+      await this.db.run(`DELETE FROM daily_logs;`);
     }
 
     this.pendingCount.next(0);
@@ -479,6 +508,51 @@ export class DatabaseService {
       }
       const query = `INSERT OR REPLACE INTO daily_logs (id, date_str, score, reason, created_at) VALUES (?, ?, ?, ?, ?)`;
       await this.db!.run(query, [finalId, key, score, reason, now]);
+    }
+  }
+
+  async seedDummyData(count: number): Promise<void> {
+    await this.ensureDbReady();
+
+    // Loop để tạo từng item
+    for (let i = 0; i < count; i++) {
+      // 1. Random Type
+      const types = Object.values(SelfOpsEventType);
+      const randomType = types[Math.floor(Math.random() * types.length)];
+
+      // 2. Random Context (Lấy ngẫu nhiên từ mẫu + số thứ tự để ko trùng 100%)
+      const randomContext =
+        SAMPLE_CONTEXTS[Math.floor(Math.random() * SAMPLE_CONTEXTS.length)] +
+        ` (Test #${i + 1})`;
+
+      // 3. Random Emotion (Lấy 1 hoặc 2 cảm xúc)
+      const randomEmotion = [
+        SAMPLE_EMOTIONS[Math.floor(Math.random() * SAMPLE_EMOTIONS.length)],
+        Math.random() > 0.5
+          ? SAMPLE_EMOTIONS[Math.floor(Math.random() * SAMPLE_EMOTIONS.length)]
+          : '',
+      ]
+        .filter((e) => e)
+        .join(',');
+
+      // 4. Random Time (Trong vòng 30 ngày qua)
+      const daysAgo = Math.floor(Math.random() * 30);
+      const randomTime = Date.now() - daysAgo * 24 * 60 * 60 * 1000;
+
+      const dummyEvent: SelfOpsEvent = {
+        uuid: AppUtils.generateUUID(),
+        type: randomType,
+        context: randomContext,
+        emotion: randomEmotion,
+        is_reviewed: Math.random() > 0.7, // 30% đã review
+        review_due_date: randomTime + 7 * 24 * 60 * 60 * 1000,
+        created_at: randomTime,
+        reflection:
+          Math.random() > 0.7 ? 'Bài học rút ra là cần cẩn thận hơn...' : '',
+        actual_outcome: Math.random() > 0.7 ? 'Kết quả cũng tạm ổn' : '',
+      };
+
+      await this.addEvent(dummyEvent);
     }
   }
 }
