@@ -504,12 +504,6 @@ export class SettingsPage implements OnInit {
 
     const { value } = await Preferences.get({ key: 'theme_dark_mode' });
     this.isDarkMode.set(value === 'true');
-
-    // Check nếu đã từng bật Dev mode thì bật luôn (Optional)
-    const devPref = await Preferences.get({ key: 'dev_mode_enabled' });
-    if (devPref.value === 'true') {
-      this.isDevMode.set(true);
-    }
   }
 
   // --- LOGIC LONG PRESS (ẤN GIỮ) ---
@@ -535,8 +529,6 @@ export class SettingsPage implements OnInit {
 
     await Haptics.notification({ type: NotificationType.Success });
     this.showToast('🔓 Đã mở khóa Developer Zone!', 'success');
-    // Lưu lại trạng thái để lần sau vào app vẫn còn
-    await Preferences.set({ key: 'dev_mode_enabled', value: 'true' });
   }
 
   // --- LOGIC DEV ZONE ---

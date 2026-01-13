@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
-import { BehaviorSubject, firstValueFrom } from 'rxjs';
+import { BehaviorSubject, firstValueFrom, Subject } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import {
   ONE_WEEK_MS,
@@ -19,30 +19,6 @@ import { AppUtils } from '../../utils/app.utils';
 
 const DB_NAME = 'self_ops_db';
 
-const SAMPLE_CONTEXTS = [
-  'Deploy production bị lỗi CSS',
-  'Quyết định refactor lại module User',
-  'Tranh luận với PM về tính năng mới',
-  'Quên backup database trước khi update',
-  'Tìm ra giải pháp fix bug memory leak',
-  'Review code của junior và phát hiện lỗi bảo mật',
-  'Họp team chốt phương án marketing',
-  'Server bị quá tải do lượng request tăng đột biến',
-  'Được khách hàng khen ngợi về giao diện mới',
-  'Lỡ tay xóa nhầm config file quan trọng',
-];
-
-const SAMPLE_EMOTIONS = [
-  'Lo lắng',
-  'Tức giận',
-  'Hào hứng',
-  'Mệt mỏi',
-  'Tự tin',
-  'Vội vàng',
-  'Buồn',
-  'Biết ơn',
-];
-
 @Injectable({
   providedIn: 'root',
 })
@@ -55,6 +31,8 @@ export class DatabaseService {
 
   private pendingCount = new BehaviorSubject<number>(0);
   public pendingCount$ = this.pendingCount.asObservable();
+
+  public dataChanged$ = new Subject<void>();
 
   constructor() {
     this.init();
@@ -297,6 +275,7 @@ export class DatabaseService {
     }
 
     this.pendingCount.next(0);
+    this.dataChanged$.next();
   }
 
   // --- QUERY METHODS ---
@@ -371,6 +350,39 @@ export class DatabaseService {
     }
   }
 
+  async getDashboardStats(): Promise<Record<string, number>> {
+    await this.ensureDbReady();
+
+    // Default stats = 0
+    const stats: Record<string, number> = {
+      DECISION: 0,
+      MISTAKE: 0,
+      STRESS: 0,
+    };
+
+    if (this.isWeb) {
+      const allKeys = await CapacitorDataStorageSqlite.keys();
+      for (const key of allKeys.keys) {
+        const val = await CapacitorDataStorageSqlite.get({ key });
+        if (val.value) {
+          const evt = JSON.parse(val.value);
+          if (evt.type) {
+            stats[evt.type] = (stats[evt.type] || 0) + 1;
+          }
+        }
+      }
+    } else {
+      const query = `SELECT type, COUNT(*) as count FROM events GROUP BY type;`;
+      const res = await this.db.query(query);
+      if (res.values) {
+        res.values.forEach((row: any) => {
+          stats[row.type] = row.count;
+        });
+      }
+    }
+    return stats;
+  }
+
   async countTotalEvents(): Promise<number> {
     await this.ensureDbReady();
     if (this.isWeb) {
@@ -403,11 +415,12 @@ export class DatabaseService {
     } else {
       // NATIVE
       const query =
-        'UPDATE event SET reflection = ?, actual_outcome = ?, is_reviewed = 1, updated_at = ? WHERE uuid = ?';
+        'UPDATE events SET reflection = ?, actual_outcome = ?, is_reviewed = 1, updated_at = ? WHERE uuid = ?';
       await this.db.run(query, [reflection, outcome, now, uuid]);
     }
 
     await this.updatePendingCount();
+    this.dataChanged$.next();
   }
 
   async getPendingReviews(): Promise<SelfOpsEvent[]> {
@@ -511,48 +524,114 @@ export class DatabaseService {
     }
   }
 
+  private createDummyEvent(index: number): any {
+    const contexts = [
+      'Deploy production bị lỗi CSS',
+      'Quyết định refactor lại module User',
+      'Tranh luận với PM về tính năng mới',
+      'Quên backup database trước khi update',
+      'Tìm ra giải pháp fix bug memory leak',
+      'Review code của junior và phát hiện lỗi bảo mật',
+      'Họp team chốt phương án marketing',
+      'Server bị quá tải do lượng request tăng đột biến',
+      'Được khách hàng khen ngợi về giao diện mới',
+      'Lỡ tay xóa nhầm config file quan trọng',
+    ];
+
+    const emotions = [
+      'Lo lắng',
+      'Tức giận',
+      'Hào hứng',
+      'Mệt mỏi',
+      'Tự tin',
+      'Vội vàng',
+      'Buồn',
+      'Biết ơn',
+    ];
+    const types = Object.values(SelfOpsEventType);
+    const randomType = types[Math.floor(Math.random() * types.length)];
+
+    const randomContext = `${
+      contexts[Math.floor(Math.random() * contexts.length)]
+    } (Test #${index + 1})`;
+
+    const randomEmotion =
+      Math.random() > 0.3
+        ? emotions[Math.floor(Math.random() * emotions.length)]
+        : '';
+
+    const daysAgo = Math.floor(Math.random() * 30); // Trong 30 ngày qua
+    const createdTime = Date.now() - daysAgo * 24 * 60 * 60 * 1000;
+
+    return {
+      uuid: AppUtils.generateUUID(),
+      type: randomType,
+      context: randomContext,
+      emotion: randomEmotion,
+      tags: [],
+      is_reviewed: Math.random() > 0.5,
+      review_due_date: createdTime + 7 * 24 * 60 * 60 * 1000,
+      created_at: createdTime,
+      reflection:
+        Math.random() > 0.7 ? 'Bài học rút ra là cần cẩn thận hơn...' : '',
+      actual_outcome: Math.random() > 0.7 ? 'Kết quả đúng như dự đoán' : '',
+    };
+  }
+
   async seedDummyData(count: number): Promise<void> {
     await this.ensureDbReady();
-
-    // Loop để tạo từng item
+    const eventsToInsert: SelfOpsEvent[] = [];
     for (let i = 0; i < count; i++) {
-      // 1. Random Type
-      const types = Object.values(SelfOpsEventType);
-      const randomType = types[Math.floor(Math.random() * types.length)];
-
-      // 2. Random Context (Lấy ngẫu nhiên từ mẫu + số thứ tự để ko trùng 100%)
-      const randomContext =
-        SAMPLE_CONTEXTS[Math.floor(Math.random() * SAMPLE_CONTEXTS.length)] +
-        ` (Test #${i + 1})`;
-
-      // 3. Random Emotion (Lấy 1 hoặc 2 cảm xúc)
-      const randomEmotion = [
-        SAMPLE_EMOTIONS[Math.floor(Math.random() * SAMPLE_EMOTIONS.length)],
-        Math.random() > 0.5
-          ? SAMPLE_EMOTIONS[Math.floor(Math.random() * SAMPLE_EMOTIONS.length)]
-          : '',
-      ]
-        .filter((e) => e)
-        .join(',');
-
-      // 4. Random Time (Trong vòng 30 ngày qua)
-      const daysAgo = Math.floor(Math.random() * 30);
-      const randomTime = Date.now() - daysAgo * 24 * 60 * 60 * 1000;
-
-      const dummyEvent: SelfOpsEvent = {
-        uuid: AppUtils.generateUUID(),
-        type: randomType,
-        context: randomContext,
-        emotion: randomEmotion,
-        is_reviewed: Math.random() > 0.7, // 30% đã review
-        review_due_date: randomTime + 7 * 24 * 60 * 60 * 1000,
-        created_at: randomTime,
-        reflection:
-          Math.random() > 0.7 ? 'Bài học rút ra là cần cẩn thận hơn...' : '',
-        actual_outcome: Math.random() > 0.7 ? 'Kết quả cũng tạm ổn' : '',
-      };
-
-      await this.addEvent(dummyEvent);
+      eventsToInsert.push(this.createDummyEvent(i));
     }
+
+    if (this.isWeb) {
+      // WEB: Chạy song song (Promise.all)
+      const promises = eventsToInsert.map((evt) => {
+        return CapacitorDataStorageSqlite.set({
+          key: evt.uuid,
+          value: JSON.stringify(evt),
+        });
+      });
+      await Promise.all(promises);
+    } else {
+      // NATIVE: CHIA NHỎ BATCH (Để tránh lỗi bind parameters limit)
+      // Mỗi gói 30 item (30 * 9 cột = 270 params < 999 limit)
+      const BATCH_SIZE = 30;
+
+      for (let i = 0; i < eventsToInsert.length; i += BATCH_SIZE) {
+        // Cắt lấy 1 khúc (chunk)
+        const chunk = eventsToInsert.slice(i, i + BATCH_SIZE);
+
+        const placeholders = chunk
+          .map(() => `(?, ?, ?, ?, ?, ?, ?, ?)`)
+          .join(', ');
+
+        const query = `
+          INSERT INTO events (uuid, type, context, emotion, tags, created_at, review_due_date, reflection) 
+          VALUES ${placeholders}
+        `;
+
+        // Gom values lại thành 1 mảng phẳng
+        const values: any[] = [];
+        chunk.forEach((evt) => {
+          values.push(
+            evt.uuid,
+            evt.type,
+            evt.context,
+            evt.emotion,
+            JSON.stringify([]),
+            evt.created_at,
+            evt.review_due_date,
+            evt.reflection
+          );
+        });
+
+        await this.db.run(query, values);
+      }
+    }
+
+    await this.updatePendingCount();
+    this.dataChanged$.next();
   }
 }

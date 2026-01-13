@@ -4,6 +4,7 @@ import {
   Component,
   computed,
   inject,
+  OnDestroy,
   OnInit,
   signal,
 } from '@angular/core';
@@ -44,6 +45,7 @@ import {
   ModalController,
 } from '@ionic/angular/standalone';
 
+import { Subject, takeUntil } from 'rxjs';
 import { AddEventModalComponent } from 'src/app/components/add-event-modal/add-event-modal.component';
 import { EventDetailModalComponent } from 'src/app/components/event-detail-modal/event-detail-modal.component';
 import { StatsModalComponent } from 'src/app/components/stats-modal/stats-modal.component';
@@ -131,7 +133,7 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
               ></ion-icon>
             </div>
             <div class="stat-info">
-              <span class="stat-count">{{ getCountByType(type) }}</span>
+              <span class="stat-count">{{ stats()[type] || 0 }}</span>
               <span class="stat-label">{{ conf.label }}</span>
             </div>
             <ion-ripple-effect></ion-ripple-effect>
@@ -158,7 +160,16 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
 
         <div class="timeline-divider">
           <h3>Dòng thời gian</h3>
-          <span class="count-badge">{{ displayEvents().length }}</span>
+          @if (totalEventsCount() > 0) {
+          <span class="count-badge fade-in">
+            @if (displayEvents().length < totalEventsCount()) {
+            {{ displayEvents().length }}
+            <span style="opacity: 0.6">/ {{ totalEventsCount() }}</span>
+            } @else {
+            {{ totalEventsCount() }}
+            }
+          </span>
+          }
         </div>
       </div>
 
@@ -241,6 +252,14 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
       /* PERFORMANCE: Ẩn scrollbar để giao diện sạch */
       ion-content::part(scroll)::-webkit-scrollbar {
         display: none;
+        width: 0 !important;
+        height: 0 !important;
+        background: transparent; /* Ẩn nền scrollbar */
+      }
+
+      ion-content::part(scroll) {
+        -ms-overflow-style: none; /* IE and Edge */
+        scrollbar-width: none; /* Firefox & Chrome mới */
       }
 
       /* --- HEADER & BRANDING --- */
@@ -570,17 +589,22 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
     `,
   ],
 })
-export class HomePage implements OnInit, ViewWillEnter {
-  private db = inject(DatabaseService);
+export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
+  private databaseService = inject(DatabaseService);
   private modalCtrl = inject(ModalController);
+  private destroy$ = new Subject<void>();
   private lastLoadTime = 0;
 
-  events = signal<SelfOpsEvent[]>([]);
   currentPage = 0;
-  readonly PAGE_SIZE = 20;
+  readonly PAGE_SIZE = 30;
+
+  events = signal<SelfOpsEvent[]>([]);
+  // State quản lý Stats (Toàn bộ DB)
+  stats = signal<Record<string, number>>({});
   isLoading = signal(false);
   isEndOfData = signal(false);
 
+  // Filter & Search
   searchQuery = signal('');
   filterType = signal<SelfOpsEventType | 'ALL'>('ALL');
 
@@ -597,9 +621,20 @@ export class HomePage implements OnInit, ViewWillEnter {
       const matchText =
         query === '' ||
         ev.context.toLowerCase().includes(query) ||
-        ev.emotion?.toLowerCase().includes(query);
+        (ev.emotion && ev.emotion.toLowerCase().includes(query));
       return matchType && matchText;
     });
+  });
+
+  totalEventsCount = computed(() => {
+    const type = this.filterType();
+    const stats = this.stats();
+
+    if (type === 'ALL') {
+      return Object.values(stats).reduce((a, b) => a + b, 0);
+    } else {
+      return stats[type] || 0;
+    }
   });
 
   constructor() {
@@ -620,58 +655,107 @@ export class HomePage implements OnInit, ViewWillEnter {
   }
 
   ngOnInit() {
-    this.db.dbReady$.subscribe((isReady) => {
-      if (isReady) this.loadData(true);
-    });
+    this.databaseService.dbReady$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((isReady) => {
+        if (isReady) this.refreshDashboard();
+      });
+
+    this.databaseService.dataChanged$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.refreshDashboard();
+      });
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   async ionViewWillEnter() {
+    // Chỉ reload nếu events đang rỗng (lần đầu vào lại tab)
+    // Nếu đã có data thì giữ nguyên scroll position, không reload lại gây giật
     const now = Date.now();
-    if (now - this.lastLoadTime < 500) return;
+    if (now - this.lastLoadTime < 500) {
+      return;
+    }
     this.lastLoadTime = now;
-    await this.loadData();
+
+    if (this.events().length === 0) {
+      await this.refreshDashboard();
+    } else {
+      // Vẫn nên update lại Stats vì có thể thay đổi từ tab khác
+      this.loadStats();
+    }
+  }
+
+  // --- LOGIC LOAD DỮ LIỆU ---
+
+  // Hàm Refresh tổng (Gọi khi Pull-to-refresh hoặc Init)
+  async refreshDashboard() {
+    this.currentPage = 0;
+    this.isEndOfData.set(false);
+    this.events.set([]);
+    this.stats.set({});
+
+    // Chạy song song 2 luồng: Load List (Page 0) & Load Stats (All)
+    await Promise.all([this.loadEvents(true), this.loadStats()]);
   }
 
   async handleRefresh(event: any) {
-    await this.loadData(true);
+    await this.refreshDashboard();
     event.target.complete();
   }
 
-  async loadData(reset: boolean = false, event?: InfiniteScrollCustomEvent) {
+  async loadEvents(
+    reset: boolean = false,
+    infiniteScrollEvent?: InfiniteScrollCustomEvent
+  ) {
     if (this.isLoading() && !reset) return;
 
     this.isLoading.set(true);
 
-    if (reset) {
-      this.currentPage = 0;
-      this.isEndOfData.set(false);
-      this.events.set([]);
-    }
-
     try {
-      const newEvents = await this.db.getEventsPaging(
-        this.currentPage,
+      const pageToLoad = reset ? 0 : this.currentPage;
+
+      const newEvents = await this.databaseService.getEventsPaging(
+        pageToLoad,
         this.PAGE_SIZE
       );
-      if (newEvents.length < this.PAGE_SIZE) this.isEndOfData.set(true);
+
+      // Check xem đã hết dữ liệu chưa
+      if (newEvents.length < this.PAGE_SIZE) {
+        this.isEndOfData.set(true);
+      }
 
       if (reset) {
         this.events.set(newEvents);
+        this.currentPage = 1; // Reset về page 1 (vì page 0 đã load)
       } else {
         this.events.update((old) => [...old, ...newEvents]);
+        this.currentPage++;
       }
-
-      if (newEvents.length > 0) this.currentPage++;
     } catch (error) {
       console.error('Load error', error);
     } finally {
       this.isLoading.set(false);
-      if (event) event.target.complete();
+      if (infiniteScrollEvent) infiniteScrollEvent.target.complete();
+    }
+  }
+
+  // Load Thống kê (Toàn bộ DB)
+  async loadStats() {
+    try {
+      const data = await this.databaseService.getDashboardStats();
+      this.stats.set(data);
+    } catch (e) {
+      console.error('Load stats failed', e);
     }
   }
 
   async onIonInfinite(ev: any) {
-    await this.loadData(false, ev);
+    await this.loadEvents(false, ev);
   }
 
   getCountByType(type: SelfOpsEventType) {
@@ -680,6 +764,8 @@ export class HomePage implements OnInit, ViewWillEnter {
 
   handleFilterChange(type: SelfOpsEventType | 'ALL') {
     this.filterType.set(this.filterType() === type ? 'ALL' : type);
+    // Khi filter, có thể user muốn search trong toàn bộ DB thay vì chỉ list hiện tại?
+    // Hiện tại ta chỉ filter trên client (displayEvents)
   }
 
   handleSearch(ev: any) {
@@ -690,6 +776,7 @@ export class HomePage implements OnInit, ViewWillEnter {
     return AppUtils.getTypeConfig(type);
   }
 
+  // --- MODALS ---
   async openAddModal() {
     const modal = await this.modalCtrl.create({
       component: AddEventModalComponent,
@@ -698,7 +785,7 @@ export class HomePage implements OnInit, ViewWillEnter {
     });
     await modal.present();
     const { role } = await modal.onWillDismiss();
-    if (role === 'confirm') this.loadData(true);
+    if (role === 'confirm') this.loadEvents(true);
   }
 
   async openDetail(event: any) {
@@ -707,12 +794,26 @@ export class HomePage implements OnInit, ViewWillEnter {
       componentProps: { event },
     });
     await modal.present();
+
     const { role } = await modal.onWillDismiss();
-    if (role === 'saved' || role === 'deleted') this.loadData(true);
+    // --- XỬ LÝ SAU KHI ĐÓNG MODAL ---
+    if (role === 'deleted') {
+      // 1. Xóa ngay lập tức khỏi UI (Client-side update)
+      this.events.update((currentList) =>
+        currentList.filter((e) => e.uuid !== event.uuid)
+      );
+
+      // 2. Load lại Stats ngầm
+      this.loadStats();
+    } else if (role === 'saved') {
+      // Nếu update nội dung thì cần load lại để cập nhật text/reflection mới
+      // Cách tối ưu: Tìm item trong mảng và update field, nhưng reload cho an toàn data
+      this.refreshDashboard();
+    }
   }
 
   async openStats() {
-    const allEvents = await this.db.getAllEvents();
+    const allEvents = await this.databaseService.getAllEvents();
     const modal = await this.modalCtrl.create({
       component: StatsModalComponent,
       componentProps: { events: allEvents },

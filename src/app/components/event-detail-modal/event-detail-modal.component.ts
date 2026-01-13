@@ -392,7 +392,15 @@ export class EventDetailModalComponent implements OnInit, OnDestroy {
         this.scrollToFocusedInput();
       }
     );
-    await Keyboard.setAccessoryBarVisible({ isVisible: true });
+
+    // FIX: Chỉ bật Accessory Bar nếu là iOS
+    if (this.platform.is('ios')) {
+      try {
+        await Keyboard.setAccessoryBarVisible({ isVisible: true });
+      } catch (e) {
+        console.warn('Keyboard accessory bar error', e);
+      }
+    }
   }
 
   setCurrentFocus(section: 'outcome' | 'reflection') {
@@ -402,16 +410,22 @@ export class EventDetailModalComponent implements OnInit, OnDestroy {
   scrollToFocusedInput() {
     if (!this.currentFocus) return;
 
-    const targetEl =
-      this.currentFocus === 'outcome'
-        ? this.outcomeEl.nativeElement
-        : this.reflectionEl.nativeElement;
+    if (!this.outcomeEl || !this.reflectionEl) {
+      console.warn('DOM chưa sẵn sàng để scroll');
+      return;
+    }
+
+    // Lấy phần tử an toàn
+    const targetRef =
+      this.currentFocus === 'outcome' ? this.outcomeEl : this.reflectionEl;
+
+    const targetEl = targetRef.nativeElement;
+    if (!targetEl) return;
 
     // Scroll section lên sát mép trên (cách 10px)
     const y = targetEl.offsetTop - 10;
     this.content.scrollToPoint(0, y, 300);
   }
-  // ----------------------
 
   close() {
     return this.modalCtrl.dismiss(null, 'cancel');
