@@ -7,13 +7,19 @@ export enum SelfOpsEventType {
 export interface SelfOpsEvent {
   uuid: string;
   type: SelfOpsEventType;
-  context: string;
-  emotion: string;
-  reflection?: string | null;
-  actual_outcome?: string;
-  is_reviewed: boolean;
-  review_due_date: number;
-  created_at: number;
+  context: string; // Nội dung chính
+  emotion: string; // Cảm xúc (Vui, buồn...)
+
+  tags: string[]; // Danh sách tag
+  meta_data: Record<string, any>; // Dữ liệu mở rộng (JSON)
+
+  reflection?: string | null; // Suy ngẫm (Review)
+  actual_outcome?: string; // Kết quả thực tế
+
+  is_reviewed: boolean; // Đã review chưa
+  review_due_date: number; // Hạn review (Timestamp)
+  created_at: number; // Ngày tạo
+  updated_at?: number; // Ngày cập nhật (Optional)
 }
 
 // Cấu hình hiển thị (Config) cho từng loại

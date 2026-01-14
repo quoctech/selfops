@@ -429,6 +429,8 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
         type: this.selectedType(),
         context: text,
         emotion: emotionStr,
+        tags: [],
+        meta_data: [],
         is_reviewed: false,
         review_due_date: Date.now() + ONE_WEEK_MS,
         created_at: Date.now(),

@@ -94,6 +94,7 @@ export class DatabaseService {
             context TEXT,
             emotion TEXT,
             tags TEXT,
+            meta_data TEXT,
             is_reviewed INTEGER DEFAULT 0,
             review_due_date INTEGER,
             reflection TEXT, 
@@ -169,7 +170,7 @@ export class DatabaseService {
   }
 
   // --- CRUD METHODS ---
-  async addEvent(event: any) {
+  async addEvent(event: SelfOpsEvent) {
     await this.ensureDbReady();
 
     const uuid = event.uuid || AppUtils.generateUUID();
@@ -177,7 +178,6 @@ export class DatabaseService {
     const dueDate = event.review_due_date || now + ONE_WEEK_MS;
 
     const tagsStr = JSON.stringify(event.tags || []);
-    // Meta data giờ chỉ lưu các cái lặt vặt khác, không chứa emotion nữa
     const metaStr =
       typeof event.meta_data === 'string'
         ? event.meta_data
@@ -194,6 +194,7 @@ export class DatabaseService {
         review_due_date: dueDate,
         is_reviewed: false,
         tags: event.tags || [],
+        meta_data: event.meta_data || {},
         reflection: '',
       };
 
@@ -204,8 +205,8 @@ export class DatabaseService {
     } else {
       // NATIVE: Thêm cột emotion vào câu INSERT
       const query = `
-        INSERT INTO events (uuid, type, context, emotion, tags, created_at, review_due_date, reflection) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO events (uuid, type, context, emotion, tags, meta_data, created_at, review_due_date, reflection, is_reviewed) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
       `;
 
       await this.db.run(query, [
@@ -214,6 +215,7 @@ export class DatabaseService {
         event.context,
         emotion,
         tagsStr,
+        metaStr,
         now,
         dueDate,
         '',
@@ -221,6 +223,7 @@ export class DatabaseService {
     }
 
     await this.updatePendingCount();
+    this.dataChanged$.next();
   }
 
   async updateReflection(uuid: string, reflectionContent: string) {
@@ -263,6 +266,7 @@ export class DatabaseService {
     }
 
     await this.updatePendingCount();
+    this.dataChanged$.next();
   }
 
   async deleteAll() {
@@ -315,6 +319,8 @@ export class DatabaseService {
         const res = await this.db.query(query, [pageSize, offset]);
         return (res.values || []).map((item) => ({
           ...item,
+          tags: item.tags ? JSON.parse(item.tags) : [],
+          meta_data: item.meta_data ? JSON.parse(item.meta_data) : {},
           is_reviewed: !!item.is_reviewed,
         })) as SelfOpsEvent[];
       } catch (e) {
@@ -346,7 +352,12 @@ export class DatabaseService {
       const res = await this.db.query(
         'SELECT * FROM events ORDER BY created_at DESC'
       );
-      return (res.values || []) as SelfOpsEvent[];
+      return (res.values || []).map((item) => ({
+        ...item,
+        tags: item.tags ? JSON.parse(item.tags) : [],
+        meta_data: item.meta_data ? JSON.parse(item.meta_data) : {},
+        is_reviewed: !!item.is_reviewed,
+      })) as SelfOpsEvent[];
     }
   }
 
@@ -396,10 +407,9 @@ export class DatabaseService {
 
   async updateReview(uuid: string, reflection: string, outcome: string) {
     await this.ensureDbReady();
-    const now = Date.now();
+    const now = AppUtils.getNow();
 
     if (this.isWeb) {
-      // WEB
       const res = await CapacitorDataStorageSqlite.get({ key: uuid });
       if (res && res.value) {
         const evt = JSON.parse(res.value);
@@ -524,7 +534,7 @@ export class DatabaseService {
     }
   }
 
-  private createDummyEvent(index: number): any {
+  private createDummyEvent(index: number): SelfOpsEvent {
     const contexts = [
       'Deploy production bị lỗi CSS',
       'Quyết định refactor lại module User',
@@ -569,6 +579,7 @@ export class DatabaseService {
       context: randomContext,
       emotion: randomEmotion,
       tags: [],
+      meta_data: {},
       is_reviewed: Math.random() > 0.5,
       review_due_date: createdTime + 7 * 24 * 60 * 60 * 1000,
       created_at: createdTime,
@@ -602,13 +613,12 @@ export class DatabaseService {
       for (let i = 0; i < eventsToInsert.length; i += BATCH_SIZE) {
         // Cắt lấy 1 khúc (chunk)
         const chunk = eventsToInsert.slice(i, i + BATCH_SIZE);
-
         const placeholders = chunk
-          .map(() => `(?, ?, ?, ?, ?, ?, ?, ?)`)
+          .map(() => `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
           .join(', ');
 
         const query = `
-          INSERT INTO events (uuid, type, context, emotion, tags, created_at, review_due_date, reflection) 
+          INSERT INTO events (uuid, type, context, emotion, tags, meta_data, created_at, review_due_date, reflection, is_reviewed) 
           VALUES ${placeholders}
         `;
 
@@ -620,7 +630,8 @@ export class DatabaseService {
             evt.type,
             evt.context,
             evt.emotion,
-            JSON.stringify([]),
+            JSON.stringify(evt.tags || []),
+            JSON.stringify(evt.meta_data || {}),
             evt.created_at,
             evt.review_due_date,
             evt.reflection
