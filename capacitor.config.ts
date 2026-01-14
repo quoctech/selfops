@@ -23,7 +23,7 @@ const config: CapacitorConfig = {
       iconColor: '#0f172a',
     },
     Keyboard: {
-      resize: KeyboardResize.Ionic,
+      resize: KeyboardResize.Body,
       style: KeyboardStyle.Dark,
     },
   },

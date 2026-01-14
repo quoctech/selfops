@@ -25,11 +25,10 @@ export class AppComponent implements OnInit {
   constructor() {
     // Kích hoạt fix lỗi focus ngay khi App khởi tạo
     this.fixFocusOnNavigation();
+    this.initDB();
   }
 
   async ngOnInit() {
-    this.initDB();
-
     // 1. Kiểm tra cài đặt Theme đã lưu
     const { value } = await Preferences.get({ key: 'theme_dark_mode' });
     const isDark = value === 'true';
@@ -43,7 +42,7 @@ export class AppComponent implements OnInit {
 
   private initDB() {
     this.platform.ready().then(async () => {
-      await this.databaseService.init();
+      await this.databaseService.initialize();
     });
   }
 

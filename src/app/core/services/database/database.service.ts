@@ -1,636 +1,141 @@
-import { Injectable } from '@angular/core';
-import { Capacitor } from '@capacitor/core';
-import { BehaviorSubject, firstValueFrom, Subject } from 'rxjs';
-import { filter } from 'rxjs/operators';
-import {
-  ONE_WEEK_MS,
-  SelfOpsEvent,
-  SelfOpsEventType,
-} from '../../models/event.type';
-
-import {
-  CapacitorSQLite,
-  SQLiteConnection,
-  SQLiteDBConnection,
-} from '@capacitor-community/sqlite';
-
-import { CapgoCapacitorDataStorageSqlite as CapacitorDataStorageSqlite } from '@capgo/capacitor-data-storage-sqlite';
+import { Injectable, inject } from '@angular/core';
+import { BehaviorSubject, Subject, firstValueFrom } from 'rxjs';
+import { debounceTime, filter } from 'rxjs/operators';
+import { SelfOpsEvent } from '../../models/event.type';
 import { AppUtils } from '../../utils/app.utils';
 
-const DB_NAME = 'self_ops_db';
+import { DailyLogRepository } from '../../repositories/daily-log.repository';
+import { EventRepository } from '../../repositories/event.repository';
+import { SqliteConnectionService } from './sqlite-connection.service';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Injectable({ providedIn: 'root' })
 export class DatabaseService {
-  private sqlite: SQLiteConnection = new SQLiteConnection(CapacitorSQLite);
-  private db!: SQLiteDBConnection;
+  // Inject dependencies
+  private connection = inject(SqliteConnectionService);
+  private eventRepo = inject(EventRepository);
+  private dailyRepo = inject(DailyLogRepository);
 
-  private isDbReady = new BehaviorSubject<boolean>(false);
-  public dbReady$ = this.isDbReady.asObservable();
-
-  private pendingCount = new BehaviorSubject<number>(0);
-  public pendingCount$ = this.pendingCount.asObservable();
-
+  // State Management
+  public dbReady$ = this.connection.dbReady$;
+  public pendingCount$ = new BehaviorSubject<number>(0);
   public dataChanged$ = new Subject<void>();
 
   constructor() {
-    this.init();
+    this.dataChanged$
+      .pipe(debounceTime(100))
+      .subscribe(() => this.updatePendingCount());
+
+    // Listen dbReady để update count
+    this.dbReady$
+      .pipe(filter((r) => r))
+      .subscribe(() => this.updatePendingCount());
   }
 
-  private get isWeb(): boolean {
-    return Capacitor.getPlatform() === 'web';
+  async initialize() {
+    await this.connection.init();
   }
 
   private async ensureDbReady() {
-    if (this.isDbReady.value) return;
-    await firstValueFrom(this.dbReady$.pipe(filter((ready) => ready === true)));
-  }
-
-  async init() {
-    try {
-      if (this.isWeb) {
-        // --- 1. WEB ---
-        await CapacitorDataStorageSqlite.openStore({
-          database: DB_NAME,
-          encrypted: false,
-          mode: 'no-encryption',
-        });
-        console.log('✅ WEB DB Ready');
-      } else {
-        // --- 2. NATIVE (Fix lỗi Connection Exists) ---
-
-        // Kiểm tra xem native có đang giữ kết nối nào không
-        await this.sqlite.checkConnectionsConsistency();
-
-        try {
-          // Cố gắng tạo kết nối mới
-          this.db = await this.sqlite.createConnection(
-            DB_NAME,
-            false,
-            'no-encryption',
-            1,
-            false
-          );
-        } catch (err: any) {
-          // Nếu lỗi báo "Connection exists" -> Lấy lại kết nối cũ
-          if (err.message && err.message.includes('already exists')) {
-            console.warn('⚠️ Connection exists, retrieving...');
-            this.db = await this.sqlite.retrieveConnection(DB_NAME, false);
-          } else {
-            // Nếu là lỗi khác thì ném ra
-            throw err;
-          }
-        }
-
-        await this.db.open();
-
-        // Tạo bảng (Lưu ý: Chỉ chạy nếu bảng chưa tồn tại. Nếu bảng cũ thiếu cột, cần gỡ app cài lại)
-        const schemaEvent = `
-          CREATE TABLE IF NOT EXISTS events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            uuid TEXT UNIQUE NOT NULL,
-            type TEXT NOT NULL,
-            context TEXT,
-            emotion TEXT,
-            tags TEXT,
-            is_reviewed INTEGER DEFAULT 0,
-            review_due_date INTEGER,
-            reflection TEXT, 
-            actual_outcome TEXT,
-            created_at INTEGER,
-            updated_at INTEGER
-          );
-        `;
-        await this.db.execute(schemaEvent);
-
-        const schemaDaily = `
-          CREATE TABLE IF NOT EXISTS daily_logs (
-            id TEXT PRIMARY KEY,
-            date_str TEXT UNIQUE NOT NULL, -- Format YYYY-MM-DD (Mỗi ngày chỉ 1 dòng)
-            score INTEGER,                 -- 0 đến 100
-            reason TEXT,                   -- Ghi chú ngắn gọn
-            created_at INTEGER
-          );
-        `;
-        await this.db.execute(schemaDaily);
-        console.log('✅ NATIVE DB Ready');
-      }
-
-      this.isDbReady.next(true);
-      await this.updatePendingCount();
-      console.log('✅ Database Initialized & Count Updated');
-    } catch (e) {
-      console.error('❌ Database Init Error:', e);
+    if (!this.connection.dbReady$.value) {
+      await firstValueFrom(
+        this.dbReady$.pipe(filter((ready) => ready === true))
+      );
     }
   }
 
-  async updatePendingCount() {
+  // ================= EVENT =================
+  async addEvent(event: SelfOpsEvent) {
     await this.ensureDbReady();
-    const now = Date.now();
-    let count = 0;
-
-    if (this.isWeb) {
-      // WEB: Lấy hết -> Filter thủ công
-      try {
-        const res = await CapacitorDataStorageSqlite.values();
-        const all = (res.values || [])
-          .map((v: string) => {
-            try {
-              return JSON.parse(v);
-            } catch {
-              return null;
-            }
-          })
-          .filter((e: any) => e !== null);
-
-        count = all.filter((e: any) => {
-          // Logic filter: Chưa review VÀ Đã đến hạn
-          const isNotReviewed = e.is_reviewed === false || e.is_reviewed === 0;
-          const isDue = e.review_due_date <= now;
-          return isNotReviewed && isDue;
-        }).length;
-      } catch (e) {
-        count = 0;
-      }
-    } else {
-      // NATIVE: Count bằng SQL cho nhanh
-      try {
-        const query = `SELECT COUNT(*) as c FROM events WHERE is_reviewed = 0 AND review_due_date <= ?`;
-        const res = await this.db.query(query, [now]);
-        count = res.values?.[0]?.c || 0;
-      } catch (e) {
-        count = 0;
-      }
-    }
-
-    // Emit giá trị mới ra cho toàn App biết
-    this.pendingCount.next(count);
+    await this.eventRepo.add(event);
+    this.dataChanged$.next();
   }
 
-  // --- CRUD METHODS ---
-  async addEvent(event: any) {
+  async getEventsPaging(page: number, size: number) {
     await this.ensureDbReady();
-
-    const uuid = event.uuid || AppUtils.generateUUID();
-    const now = Date.now();
-    const dueDate = event.review_due_date || now + ONE_WEEK_MS;
-
-    const tagsStr = JSON.stringify(event.tags || []);
-    // Meta data giờ chỉ lưu các cái lặt vặt khác, không chứa emotion nữa
-    const metaStr =
-      typeof event.meta_data === 'string'
-        ? event.meta_data
-        : JSON.stringify(event.meta_data || {});
-
-    const emotion = event.emotion || '';
-
-    if (this.isWeb) {
-      const newEvent = {
-        ...event,
-        uuid,
-        emotion,
-        created_at: now,
-        review_due_date: dueDate,
-        is_reviewed: false,
-        tags: event.tags || [],
-        reflection: '',
-      };
-
-      await CapacitorDataStorageSqlite.set({
-        key: uuid,
-        value: JSON.stringify(newEvent),
-      });
-    } else {
-      // NATIVE: Thêm cột emotion vào câu INSERT
-      const query = `
-        INSERT INTO events (uuid, type, context, emotion, tags, created_at, review_due_date, reflection) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-
-      await this.db.run(query, [
-        uuid,
-        event.type,
-        event.context,
-        emotion,
-        tagsStr,
-        now,
-        dueDate,
-        '',
-      ]);
-    }
-
-    await this.updatePendingCount();
+    return this.eventRepo.getPaging(page, size);
   }
 
-  async updateReflection(uuid: string, reflectionContent: string) {
+  async getAllEvents() {
     await this.ensureDbReady();
-    const now = Date.now();
+    return this.eventRepo.getAll();
+  }
 
-    if (this.isWeb) {
-      try {
-        const res = await CapacitorDataStorageSqlite.get({ key: uuid });
-        if (res && res.value) {
-          const evt = JSON.parse(res.value);
-          evt.reflection = reflectionContent;
-          evt.updated_at = now;
-          evt.is_reviewed = true;
-          await CapacitorDataStorageSqlite.set({
-            key: uuid,
-            value: JSON.stringify(evt),
-          });
-        }
-      } catch (err) {
-        console.error('❌ Web Update Error', err);
-      }
-    } else {
-      // NATIVE
-      const query = `
-        UPDATE events 
-        SET reflection = ?, is_reviewed = 1, updated_at = ? 
-        WHERE uuid = ?
-      `;
-      await this.db.run(query, [reflectionContent, now, uuid]);
-    }
+  async updateReflection(uuid: string, reflection: string) {
+    await this.ensureDbReady();
+    // outcome tạm để trống hoặc handle sau
+    await this.eventRepo.updateReview(uuid, reflection, '', AppUtils.getNow());
+    this.dataChanged$.next();
+  }
+
+  // Hàm này để tương thích code cũ (nếu có chỗ nào gọi full params)
+  async updateReview(uuid: string, reflection: string, outcome: string) {
+    await this.ensureDbReady();
+    await this.eventRepo.updateReview(
+      uuid,
+      reflection,
+      outcome,
+      AppUtils.getNow()
+    );
+    this.dataChanged$.next();
   }
 
   async deleteEvent(uuid: string) {
     await this.ensureDbReady();
-    if (this.isWeb) {
-      await CapacitorDataStorageSqlite.remove({ key: uuid });
-    } else {
-      await this.db.run('DELETE FROM events WHERE uuid = ?', [uuid]);
-    }
-
-    await this.updatePendingCount();
-  }
-
-  async deleteAll() {
-    await this.ensureDbReady();
-    if (this.isWeb) {
-      await CapacitorDataStorageSqlite.clear();
-    } else {
-      await this.db.run('DELETE FROM events');
-      await this.db.run(`DELETE FROM daily_logs;`);
-    }
-
-    this.pendingCount.next(0);
+    await this.eventRepo.delete(uuid);
     this.dataChanged$.next();
   }
 
-  // --- QUERY METHODS ---
-
-  async getEventsPaging(
-    page: number,
-    pageSize: number
-  ): Promise<SelfOpsEvent[]> {
+  async getDashboardStats() {
     await this.ensureDbReady();
-
-    if (this.isWeb) {
-      try {
-        const res = await CapacitorDataStorageSqlite.values();
-        const allEvents = (res.values || [])
-          .map((v: string) => {
-            try {
-              return JSON.parse(v);
-            } catch {
-              return null;
-            }
-          })
-          .filter((e: any) => e !== null)
-          // FIX: Lọc bỏ Daily Logs (nếu có date_str hoặc không có type)
-          .filter((e: any) => !e.date_str && e.type)
-          .sort((a: any, b: any) => b.created_at - a.created_at);
-
-        const start = page * pageSize;
-        return allEvents.slice(start, start + pageSize);
-      } catch (e) {
-        return [];
-      }
-    } else {
-      const offset = page * pageSize;
-      const query =
-        'SELECT * FROM events ORDER BY created_at DESC LIMIT ? OFFSET ?';
-      try {
-        const res = await this.db.query(query, [pageSize, offset]);
-        return (res.values || []).map((item) => ({
-          ...item,
-          is_reviewed: !!item.is_reviewed,
-        })) as SelfOpsEvent[];
-      } catch (e) {
-        return [];
-      }
-    }
+    return this.eventRepo.getStats();
   }
 
-  async getAllEvents(): Promise<SelfOpsEvent[]> {
-    await this.ensureDbReady();
-
-    if (this.isWeb) {
-      const res = await CapacitorDataStorageSqlite.values();
-      return (
-        (res.values || [])
-          .map((v: string) => {
-            try {
-              return JSON.parse(v);
-            } catch {
-              return null;
-            }
-          })
-          .filter((e: any) => e !== null)
-          // FIX: Lọc bỏ Daily Logs
-          .filter((e: any) => !e.date_str && e.type)
-          .sort((a: any, b: any) => b.created_at - a.created_at)
-      );
-    } else {
-      const res = await this.db.query(
-        'SELECT * FROM events ORDER BY created_at DESC'
-      );
-      return (res.values || []) as SelfOpsEvent[];
-    }
+  async countTotalEvents() {
+    // Có thể thêm hàm count vào Repo sau, giờ dùng tạm getStats hoặc getAll
+    const all = await this.getAllEvents();
+    return all.length;
   }
 
-  async getDashboardStats(): Promise<Record<string, number>> {
+  async getPendingReviews() {
     await this.ensureDbReady();
-
-    // Default stats = 0
-    const stats: Record<string, number> = {
-      DECISION: 0,
-      MISTAKE: 0,
-      STRESS: 0,
-    };
-
-    if (this.isWeb) {
-      const allKeys = await CapacitorDataStorageSqlite.keys();
-      for (const key of allKeys.keys) {
-        const val = await CapacitorDataStorageSqlite.get({ key });
-        if (val.value) {
-          const evt = JSON.parse(val.value);
-          if (evt.type) {
-            stats[evt.type] = (stats[evt.type] || 0) + 1;
-          }
-        }
-      }
-    } else {
-      const query = `SELECT type, COUNT(*) as count FROM events GROUP BY type;`;
-      const res = await this.db.query(query);
-      if (res.values) {
-        res.values.forEach((row: any) => {
-          stats[row.type] = row.count;
-        });
-      }
-    }
-    return stats;
+    return this.eventRepo.getPendingReviews(AppUtils.getNow());
   }
 
-  async countTotalEvents(): Promise<number> {
-    await this.ensureDbReady();
-    if (this.isWeb) {
-      const res = await CapacitorDataStorageSqlite.keys();
-      return res.keys ? res.keys.length : 0;
-    } else {
-      const res = await this.db.query('SELECT COUNT(*) as count FROM events');
-      return res.values?.[0]?.count || 0;
-    }
-  }
-
-  async updateReview(uuid: string, reflection: string, outcome: string) {
-    await this.ensureDbReady();
-    const now = Date.now();
-
-    if (this.isWeb) {
-      // WEB
-      const res = await CapacitorDataStorageSqlite.get({ key: uuid });
-      if (res && res.value) {
-        const evt = JSON.parse(res.value);
-        evt.reflection = reflection;
-        evt.actual_outcome = outcome;
-        evt.updated_at = now;
-        evt.is_reviewed = true;
-        await CapacitorDataStorageSqlite.set({
-          key: uuid,
-          value: JSON.stringify(evt),
-        });
-      }
-    } else {
-      // NATIVE
-      const query =
-        'UPDATE events SET reflection = ?, actual_outcome = ?, is_reviewed = 1, updated_at = ? WHERE uuid = ?';
-      await this.db.run(query, [reflection, outcome, now, uuid]);
-    }
-
-    await this.updatePendingCount();
-    this.dataChanged$.next();
-  }
-
-  async getPendingReviews(): Promise<SelfOpsEvent[]> {
-    await this.ensureDbReady();
-    const now = Date.now();
-
-    if (this.isWeb) {
-      // WEB: Lấy hết -> Filter bằng JS
-      try {
-        const res = await CapacitorDataStorageSqlite.values();
-        const allEvents = (res.values || [])
-          .map((v: string) => {
-            try {
-              return JSON.parse(v);
-            } catch {
-              return null;
-            }
-          })
-          .filter((e: any) => e !== null)
-          // 👇 FIX 4: Lọc bỏ Daily Logs
-          .filter((e: any) => !e.date_str && e.type);
-
-        return allEvents
-          .filter((e: SelfOpsEvent) => {
-            const isDue = e.review_due_date <= now;
-            return !e.is_reviewed && isDue;
-          })
-          .sort((a: any, b: any) => a.review_due_date - b.review_due_date);
-      } catch (e) {
-        console.error('Web Pending Error', e);
-        return [];
-      }
-    } else {
-      // NATIVE: SQL Query tối ưu
-      const query =
-        'SELECT * FROM events WHERE is_reviewed = 0 AND review_due_date <= ? ORDER BY review_due_date ASC';
-      try {
-        const res = await this.db.query(query, [now]);
-        return (res.values || []).map((item) => ({
-          ...item,
-          is_reviewed: !!item.is_reviewed,
-        })) as SelfOpsEvent[];
-      } catch (e) {
-        console.error('Native Pending Error', e);
-        return [];
-      }
-    }
-  }
-
-  // --- DAILY LOGS METHODS ---
+  // ================= DAILY LOG =================
   async getTodayLog() {
     await this.ensureDbReady();
-    const key = AppUtils.getTodayKey();
-
-    if (this.isWeb) {
-      try {
-        const res = await CapacitorDataStorageSqlite.get({
-          key: `daily_${key}`,
-        });
-        return res.value ? JSON.parse(res.value) : null;
-      } catch {
-        return null;
-      }
-    } else {
-      const query = `SELECT * FROM daily_logs WHERE date_str = ?`;
-      const res = await this.db.query(query, [key]);
-      return res.values?.[0] || null;
-    }
+    return this.dailyRepo.getByDate(AppUtils.getTodayKey());
   }
 
   async saveDailyLog(score: number, reason: string) {
     await this.ensureDbReady();
-    const key = AppUtils.getTodayKey();
-    const now = AppUtils.getNow();
-    const uuid = AppUtils.generateUUID();
-
-    if (this.isWeb) {
-      // WEB: Lưu vào kho chung nhưng ID là daily_YYYY-MM-DD
-      const log = {
-        id: uuid,
-        uuid: uuid,
-        date_str: key,
-        score,
-        reason,
-        created_at: now,
-      };
-      await CapacitorDataStorageSqlite.set({
-        key: `daily_${key}`,
-        value: JSON.stringify(log),
-      });
-    } else {
-      // NATIVE: Lưu vào bảng riêng
-      const checkQuery = `SELECT id FROM daily_logs WHERE date_str = ?`;
-      const existing = await this.db!.query(checkQuery, [key]);
-      let finalId = uuid;
-      if (existing.values && existing.values.length > 0) {
-        finalId = existing.values[0].id;
-      }
-      const query = `INSERT OR REPLACE INTO daily_logs (id, date_str, score, reason, created_at) VALUES (?, ?, ?, ?, ?)`;
-      await this.db!.run(query, [finalId, key, score, reason, now]);
-    }
-  }
-
-  private createDummyEvent(index: number): any {
-    const contexts = [
-      'Deploy production bị lỗi CSS',
-      'Quyết định refactor lại module User',
-      'Tranh luận với PM về tính năng mới',
-      'Quên backup database trước khi update',
-      'Tìm ra giải pháp fix bug memory leak',
-      'Review code của junior và phát hiện lỗi bảo mật',
-      'Họp team chốt phương án marketing',
-      'Server bị quá tải do lượng request tăng đột biến',
-      'Được khách hàng khen ngợi về giao diện mới',
-      'Lỡ tay xóa nhầm config file quan trọng',
-    ];
-
-    const emotions = [
-      'Lo lắng',
-      'Tức giận',
-      'Hào hứng',
-      'Mệt mỏi',
-      'Tự tin',
-      'Vội vàng',
-      'Buồn',
-      'Biết ơn',
-    ];
-    const types = Object.values(SelfOpsEventType);
-    const randomType = types[Math.floor(Math.random() * types.length)];
-
-    const randomContext = `${
-      contexts[Math.floor(Math.random() * contexts.length)]
-    } (Test #${index + 1})`;
-
-    const randomEmotion =
-      Math.random() > 0.3
-        ? emotions[Math.floor(Math.random() * emotions.length)]
-        : '';
-
-    const daysAgo = Math.floor(Math.random() * 30); // Trong 30 ngày qua
-    const createdTime = Date.now() - daysAgo * 24 * 60 * 60 * 1000;
-
-    return {
-      uuid: AppUtils.generateUUID(),
-      type: randomType,
-      context: randomContext,
-      emotion: randomEmotion,
-      tags: [],
-      is_reviewed: Math.random() > 0.5,
-      review_due_date: createdTime + 7 * 24 * 60 * 60 * 1000,
-      created_at: createdTime,
-      reflection:
-        Math.random() > 0.7 ? 'Bài học rút ra là cần cẩn thận hơn...' : '',
-      actual_outcome: Math.random() > 0.7 ? 'Kết quả đúng như dự đoán' : '',
+    const log = {
+      id: AppUtils.generateUUID(),
+      date_str: AppUtils.getTodayKey(),
+      score,
+      reason,
+      created_at: AppUtils.getNow(),
     };
+    await this.dailyRepo.save(log);
+    this.dataChanged$.next();
   }
 
-  async seedDummyData(count: number): Promise<void> {
+  // ================= SYSTEM =================
+  async deleteAll() {
     await this.ensureDbReady();
-    const eventsToInsert: SelfOpsEvent[] = [];
-    for (let i = 0; i < count; i++) {
-      eventsToInsert.push(this.createDummyEvent(i));
-    }
+    await this.eventRepo.deleteAll(); // có xóa dữ liệu ở WebStorage rồi
+    await this.dailyRepo.deleteAll();
+    this.dataChanged$.next();
+  }
 
-    if (this.isWeb) {
-      // WEB: Chạy song song (Promise.all)
-      const promises = eventsToInsert.map((evt) => {
-        return CapacitorDataStorageSqlite.set({
-          key: evt.uuid,
-          value: JSON.stringify(evt),
-        });
-      });
-      await Promise.all(promises);
-    } else {
-      // NATIVE: CHIA NHỎ BATCH (Để tránh lỗi bind parameters limit)
-      // Mỗi gói 30 item (30 * 9 cột = 270 params < 999 limit)
-      const BATCH_SIZE = 30;
+  private async updatePendingCount() {
+    const list = await this.eventRepo.getPendingReviews(AppUtils.getNow());
+    this.pendingCount$.next(list.length);
+  }
 
-      for (let i = 0; i < eventsToInsert.length; i += BATCH_SIZE) {
-        // Cắt lấy 1 khúc (chunk)
-        const chunk = eventsToInsert.slice(i, i + BATCH_SIZE);
-
-        const placeholders = chunk
-          .map(() => `(?, ?, ?, ?, ?, ?, ?, ?)`)
-          .join(', ');
-
-        const query = `
-          INSERT INTO events (uuid, type, context, emotion, tags, created_at, review_due_date, reflection) 
-          VALUES ${placeholders}
-        `;
-
-        // Gom values lại thành 1 mảng phẳng
-        const values: any[] = [];
-        chunk.forEach((evt) => {
-          values.push(
-            evt.uuid,
-            evt.type,
-            evt.context,
-            evt.emotion,
-            JSON.stringify([]),
-            evt.created_at,
-            evt.review_due_date,
-            evt.reflection
-          );
-        });
-
-        await this.db.run(query, values);
-      }
-    }
-
+  async seedDummyData(count: number) {
+    await this.ensureDbReady();
+    await this.eventRepo.seedDummyData(count);
     await this.updatePendingCount();
     this.dataChanged$.next();
   }
