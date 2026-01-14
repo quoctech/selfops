@@ -35,3 +35,24 @@
 /* @import "@ionic/angular/css/palettes/dark.always.css"; */
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
 @import '@ionic/angular/css/palettes/dark.system.css';
+
+/* FIX WHITE FLASH KEYBOARD */
+/* 1. Mặc định (Light Mode) */
+html,
+body {
+    background-color: #f8fafc;
+    /* Slate 50 - Trùng màu nền light */
+}
+
+/* 2. Khi có class .dark (Do người dùng bật trong App) */
+body.dark {
+    background-color: #09090b;
+    /* Deep Carbon - Trùng màu nền dark */
+}
+
+/* 3. Khi Hệ điều hành đang ở Dark Mode (Lúc mới mở App chưa load xong JS) */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #09090b;
+    }
+}

@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appId: 'io.ionic.starter',
   appName: 'Self Ops',
   webDir: 'www',
-  backgroundColor: '#0f172a',
+  backgroundColor: '#09090b',
   plugins: {
     SplashScreen: {
       launchAutoHide: true, // Tự động tắt

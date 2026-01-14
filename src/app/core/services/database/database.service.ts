@@ -50,9 +50,14 @@ export class DatabaseService {
     this.dataChanged$.next();
   }
 
-  async getEventsPaging(page: number, size: number) {
+  async getEventsPaging(
+    page: number,
+    size: number,
+    type: string = 'ALL',
+    search: string = ''
+  ) {
     await this.ensureDbReady();
-    return this.eventRepo.getPaging(page, size);
+    return this.eventRepo.getPaging(page, size, type, search);
   }
 
   async getAllEvents() {
@@ -99,6 +104,20 @@ export class DatabaseService {
   async getPendingReviews() {
     await this.ensureDbReady();
     return this.eventRepo.getPendingReviews(AppUtils.getNow());
+  }
+
+  async getEventsByReviewStatus(isReviewed: boolean) {
+    await this.ensureDbReady();
+    return this.eventRepo.getByReviewStatus(isReviewed);
+  }
+
+  async getPendingCount() {
+    return this.eventRepo.countPending();
+  }
+
+  async countEventsByFilter(type: string, search: string) {
+    await this.ensureDbReady();
+    return this.eventRepo.countByFilterAndSearch(type, search);
   }
 
   // ================= DAILY LOG =================

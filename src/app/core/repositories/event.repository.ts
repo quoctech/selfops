@@ -77,17 +77,50 @@ export class EventRepository {
   }
 
   // --- QUERIES ---
-  async getPaging(page: number, size: number): Promise<SelfOpsEvent[]> {
+  async getPaging(
+    page: number,
+    size: number,
+    filterType?: string,
+    searchQuery?: string
+  ): Promise<SelfOpsEvent[]> {
     if (this.sql.isWeb) {
-      const all = await this.getAllFromWeb();
+      let all = await this.getAllFromWeb();
+      if (filterType && filterType !== 'ALL') {
+        all = all.filter((e) => e.type === filterType);
+      }
+
+      if (searchQuery && searchQuery.trim() !== '') {
+        const lowerQ = searchQuery.toLowerCase().trim();
+        all = all.filter(
+          (e) =>
+            e.context.toLowerCase().includes(lowerQ) ||
+            (e.emotion && e.emotion.toLowerCase().includes(lowerQ))
+        );
+      }
+
       const start = page * size;
       return all.slice(start, start + size);
     } else {
       const offset = page * size;
-      const res = await this.sql.query(
-        'SELECT * FROM events ORDER BY created_at DESC LIMIT ? OFFSET ?',
-        [size, offset]
-      );
+
+      // Mẹo: Dùng WHERE 1=1 để dễ nối chuỗi AND
+      let query = 'SELECT * FROM events WHERE 1=1';
+      const params: any[] = [];
+
+      if (filterType && filterType !== 'ALL') {
+        query += ' WHERE type = ?';
+        params.push(filterType);
+      }
+
+      if (searchQuery && searchQuery.trim() !== '') {
+        query += ' AND (context LIKE ? OR emotion LIKE ?)';
+        params.push(`%${searchQuery}%`, `%${searchQuery}%`);
+      }
+
+      query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+      params.push(size, offset);
+
+      const res = await this.sql.query(query, params);
       return (res.values || []).map(this.mapRowToEvent);
     }
   }
@@ -112,6 +145,78 @@ export class EventRepository {
         [now]
       );
       return (res.values || []).map(this.mapRowToEvent);
+    }
+  }
+
+  async getByReviewStatus(isReviewed: boolean): Promise<SelfOpsEvent[]> {
+    const statusVal = isReviewed ? 1 : 0;
+
+    if (this.sql.isWeb) {
+      const all = await this.getAllFromWeb();
+      return all
+        .filter((e) => !!e.is_reviewed === isReviewed)
+        .sort((a, b) => {
+          if (isReviewed) return (b.updated_at || 0) - (a.updated_at || 0); // Mới review lên đầu
+          return a.review_due_date - b.review_due_date; // Hết hạn lên đầu
+        });
+    } else {
+      // NATIVE: Tối ưu SQL
+      // Pending -> Sắp xếp theo Deadline (càng gấp càng lên trên)
+      // Reviewed -> Sắp xếp theo ngày Review (mới làm xong lên trên)
+      const orderBy = isReviewed ? 'updated_at DESC' : 'review_due_date ASC';
+
+      const query = `SELECT * FROM events WHERE is_reviewed = ? ORDER BY ${orderBy}`;
+
+      const res = await this.sql.query(query, [statusVal]);
+      return (res.values || []).map(this.mapRowToEvent);
+    }
+  }
+
+  // Hàm đếm nhanh (Lightweight count)
+  async countPending(): Promise<number> {
+    if (this.sql.isWeb) {
+      return (await this.getAllFromWeb()).filter((e) => !e.is_reviewed).length;
+    } else {
+      const res = await this.sql.query(
+        'SELECT COUNT(*) as c FROM events WHERE is_reviewed = 0'
+      );
+      return res.values?.[0]?.c || 0;
+    }
+  }
+
+  // Thêm hàm đếm search
+  async countByFilterAndSearch(type: string, search: string): Promise<number> {
+    if (this.sql.isWeb) {
+      let all = await this.getAllFromWeb();
+      if (type && type !== 'ALL') {
+        all = all.filter((e) => e.type === type);
+      }
+
+      if (search && search.trim() !== '') {
+        const lowerQ = search.toLowerCase().trim();
+        all = all.filter(
+          (e) =>
+            e.context.toLowerCase().includes(lowerQ) ||
+            (e.emotion && e.emotion.toLowerCase().includes(lowerQ))
+        );
+      }
+      return all.length;
+    } else {
+      let query = 'SELECT COUNT(*) as c FROM events WHERE 1=1';
+      const params: any[] = [];
+
+      if (type && type !== 'ALL') {
+        query += ' AND type = ?';
+        params.push(type);
+      }
+
+      if (search && search.trim() !== '') {
+        query += ' AND (context LIKE ? OR emotion LIKE ?)';
+        params.push(`%${search}%`, `%${search}%`);
+      }
+
+      const res = await this.sql.query(query, params);
+      return res.values?.[0]?.c || 0;
     }
   }
 

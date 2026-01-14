@@ -68,16 +68,12 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
         --color-selected: var(--ion-color-primary);
       }
 
-      /* FIX LỆCH: Làm cho wrapper hành xử giống hệt icon bình thường */
       .icon-wrapper {
         position: relative;
-        display: flex; /* Giúp căn giữa icon bên trong */
+        display: inline-flex;
         justify-content: center;
         align-items: center;
-        font-size: 24px; /* Kích thước chuẩn của icon tab */
-        width: 100%; /* Chiếm hết chiều ngang nút để dễ căn */
-        height: 26px; /* Chiều cao cố định tương đương icon */
-        margin-bottom: 2px; /* Khoảng cách với Label bên dưới */
+        overflow: visible; /* Để badge văng ra ngoài không bị che */
       }
 
       /* Chỉnh lại icon bên trong wrapper để nó không bị sai size */
@@ -88,18 +84,24 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
       /* Badge số tròn */
       .notify-badge {
         position: absolute;
-        top: -4px; /* Tinh chỉnh lại vị trí */
-        right: calc(50% - 18px); /* Mẹo: Căn từ giữa ra phải một chút */
-        border-radius: 50%;
-        font-size: 0.6rem;
-        padding: 0;
+        top: -2px;
+        right: -8px;
+
         min-width: 16px;
         height: 16px;
+        border-radius: 10px;
+        padding: 0 4px;
+
+        font-size: 10px;
+        font-weight: 700;
+
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 10;
-        border: 2px solid var(--ion-background-color);
+
+        background: var(--ion-color-danger);
+        color: white;
+        border: 2px solid var(--ion-tab-bar-background, #fff);
       }
     `,
   ],
