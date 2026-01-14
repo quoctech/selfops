@@ -104,6 +104,7 @@ import { NotificationService } from 'src/app/core/services/notification.service'
             [checked]="notificationEnabled()"
             (ionChange)="toggleNotification($event)"
             mode="ios"
+            slot="end"
           ></ion-toggle>
         </ion-item>
 
@@ -134,6 +135,7 @@ import { NotificationService } from 'src/app/core/services/notification.service'
             [checked]="isDarkMode()"
             (ionChange)="toggleTheme($event)"
             mode="ios"
+            slot="end"
           ></ion-toggle>
         </ion-item>
       </ion-list>
@@ -234,7 +236,7 @@ import { NotificationService } from 'src/app/core/services/notification.service'
           (mousedown)="startPress()"
           (mouseup)="endPress()"
         >
-          <span>v1.2.4</span>
+          <span>v1.2.6</span>
           <span class="dot">•</span>
           <span>Build 2026.01</span>
         </div>

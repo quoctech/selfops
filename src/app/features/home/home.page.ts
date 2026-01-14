@@ -45,7 +45,7 @@ import {
   ModalController,
 } from '@ionic/angular/standalone';
 
-import { Subject, takeUntil } from 'rxjs';
+import { debounceTime, distinctUntilChanged, Subject, takeUntil } from 'rxjs';
 import { AddEventModalComponent } from 'src/app/components/add-event-modal/add-event-modal.component';
 import { EventDetailModalComponent } from 'src/app/components/event-detail-modal/event-detail-modal.component';
 import { StatsModalComponent } from 'src/app/components/stats-modal/stats-modal.component';
@@ -249,19 +249,6 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
   `,
   styles: [
     `
-      /* PERFORMANCE: Ẩn scrollbar để giao diện sạch */
-      ion-content::part(scroll)::-webkit-scrollbar {
-        display: none;
-        width: 0 !important;
-        height: 0 !important;
-        background: transparent; /* Ẩn nền scrollbar */
-      }
-
-      ion-content::part(scroll) {
-        -ms-overflow-style: none; /* IE and Edge */
-        scrollbar-width: none; /* Firefox & Chrome mới */
-      }
-
       /* --- HEADER & BRANDING --- */
       ion-toolbar {
         --background: transparent;
@@ -538,7 +525,7 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
       }
       .emotion-tag {
         font-size: 0.75rem;
-        color: var(--ion-color-dark);
+        color: var(--ion-text-color);
         background: var(--ion-color-light);
         padding: 4px 10px;
         border-radius: 6px;
@@ -594,6 +581,7 @@ export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
   private modalCtrl = inject(ModalController);
   private destroy$ = new Subject<void>();
   private lastLoadTime = 0;
+  private searchSubject = new Subject<string>();
 
   currentPage = 0;
   readonly PAGE_SIZE = 30;
@@ -603,6 +591,7 @@ export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
   stats = signal<Record<string, number>>({});
   isLoading = signal(false);
   isEndOfData = signal(false);
+  searchTotalCount = signal<number>(0);
 
   // Filter & Search
   searchQuery = signal('');
@@ -612,24 +601,32 @@ export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
   eventTypes = Object.values(SelfOpsEventType);
 
   displayEvents = computed(() => {
-    const all = this.events();
+    /*const list = this.events(); // List này đã được lọc theo Type từ DB rồi
     const query = this.searchQuery().toLowerCase().trim();
-    const type = this.filterType();
 
-    return all.filter((ev) => {
-      const matchType = type === 'ALL' || ev.type === type;
+    return list.filter((ev) => {
       const matchText =
         query === '' ||
         ev.context.toLowerCase().includes(query) ||
         (ev.emotion && ev.emotion.toLowerCase().includes(query));
-      return matchType && matchText;
-    });
+      return matchText;
+    });*/
+
+    // Vì this.events() giờ đã là kết quả chính xác từ DB rồi
+    return this.events();
   });
 
   totalEventsCount = computed(() => {
+    const query = this.searchQuery().trim();
+
+    // TRƯỜNG HỢP 1: ĐANG TÌM KIẾM
+    if (query !== '') {
+      return this.searchTotalCount();
+    }
+
+    // TH2: BÌNH THƯỜNG (Dùng stats cached cho nhanh)
     const type = this.filterType();
     const stats = this.stats();
-
     if (type === 'ALL') {
       return Object.values(stats).reduce((a, b) => a + b, 0);
     } else {
@@ -665,6 +662,16 @@ export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         this.refreshDashboard();
+      });
+
+    this.searchSubject
+      .pipe(
+        debounceTime(400), // Chờ 400ms sau khi ngừng gõ
+        distinctUntilChanged() // Chỉ chạy nếu nội dung khác lần trước
+      )
+      .subscribe((text) => {
+        this.searchQuery.set(text);
+        this.loadEvents(true);
       });
   }
 
@@ -719,10 +726,30 @@ export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
     try {
       const pageToLoad = reset ? 0 : this.currentPage;
 
-      const newEvents = await this.databaseService.getEventsPaging(
-        pageToLoad,
-        this.PAGE_SIZE
-      );
+      const currentFilter = this.filterType();
+      const currentSearch = this.searchQuery();
+
+      const promises: Promise<any>[] = [
+        this.databaseService.getEventsPaging(
+          pageToLoad,
+          this.PAGE_SIZE,
+          currentFilter,
+          currentSearch
+        ),
+      ];
+
+      // Nếu là lần load đầu tiên của search/filter, ta đếm tổng luôn
+      if (reset) {
+        promises.push(
+          this.databaseService.countEventsByFilter(currentFilter, currentSearch)
+        );
+      }
+
+      const [newEvents, totalCount] = await Promise.all(promises);
+      // Nếu có count mới thì update signal
+      if (reset && typeof totalCount === 'number') {
+        this.searchTotalCount.set(totalCount);
+      }
 
       // Check xem đã hết dữ liệu chưa
       if (newEvents.length < this.PAGE_SIZE) {
@@ -762,14 +789,15 @@ export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
     return this.events().filter((e) => e.type === type).length;
   }
 
-  handleFilterChange(type: SelfOpsEventType | 'ALL') {
-    this.filterType.set(this.filterType() === type ? 'ALL' : type);
-    // Khi filter, có thể user muốn search trong toàn bộ DB thay vì chỉ list hiện tại?
-    // Hiện tại ta chỉ filter trên client (displayEvents)
+  async handleFilterChange(type: SelfOpsEventType | 'ALL') {
+    const newType = this.filterType() === type ? 'ALL' : type;
+    this.filterType.set(newType);
+
+    await this.refreshDashboard();
   }
 
   handleSearch(ev: any) {
-    this.searchQuery.set(ev.detail.value);
+    this.searchSubject.next(ev.detail.value);
   }
 
   getEventConfig(type: string | SelfOpsEventType) {

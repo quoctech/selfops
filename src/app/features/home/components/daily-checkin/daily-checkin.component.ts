@@ -24,6 +24,7 @@ import {
   sadOutline,
   saveOutline,
 } from 'ionicons/icons';
+import { Subject, takeUntil } from 'rxjs';
 import { DatabaseService } from 'src/app/core/services/database/database.service';
 
 @Component({
@@ -89,7 +90,7 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
         <div class="input-area">
           <ion-textarea
             [(ngModel)]="reason"
-            placeholder="Điều gì làm nên ngày hôm nay?"
+            placeholder="Bạn hôm nay thế nào?"
             rows="1"
             [autoGrow]="true"
             class="reason-input"
@@ -179,10 +180,10 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
         ); /* Auto Dark Mode support */
         --padding-start: 16px;
         --padding-end: 16px;
-        --padding-top: 12px;
-        --padding-bottom: 12px;
-        --border-radius: 24px; /* Tròn kiểu iMessage */
-        font-size: 0.95rem;
+        --padding-top: 16px;
+        --padding-bottom: 16px;
+        --border-radius: 24px;
+        font-size: 0.8rem;
         min-height: 48px;
         flex: 1;
         border: 1px solid transparent;
@@ -265,7 +266,8 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
   ],
 })
 export class DailyCheckInComponent implements OnInit {
-  private db = inject(DatabaseService);
+  private databaseService = inject(DatabaseService);
+  private destroy$ = new Subject<void>();
 
   score = signal(50);
   reason = signal('');
@@ -298,11 +300,32 @@ export class DailyCheckInComponent implements OnInit {
   }
 
   async ngOnInit() {
-    const log = await this.db.getTodayLog();
+    this.checkStatus();
+
+    // Lắng nghe thay đổi từ DB (Xóa data, restore backup...)
+    this.databaseService.dataChanged$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.checkStatus();
+      });
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  async checkStatus() {
+    const log = await this.databaseService.getTodayLog();
     if (log) {
       this.score.set(log.score);
       this.reason.set(log.reason);
       this.hasCheckedIn.set(true);
+    } else {
+      // Nếu không tìm thấy log (vừa bị xóa), reset về mặc định
+      this.hasCheckedIn.set(false);
+      this.score.set(50);
+      this.reason.set('');
     }
   }
 
@@ -313,7 +336,7 @@ export class DailyCheckInComponent implements OnInit {
   async submit() {
     this.isSaving.set(true);
     try {
-      await this.db.saveDailyLog(this.score(), this.reason());
+      await this.databaseService.saveDailyLog(this.score(), this.reason());
       this.hasCheckedIn.set(true);
     } catch (e) {
       console.error(e);
