@@ -249,6 +249,7 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
       /* --- HEADER & BRANDING --- */
       ion-header {
         background: transparent;
+        border: none !important;
       }
 
       ion-toolbar {

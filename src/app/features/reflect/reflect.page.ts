@@ -216,7 +216,7 @@ type FilterType = 'PENDING' | 'REVIEWED';
     `
       /* --- HEADER & SEGMENT --- */
       ion-toolbar {
-        --background: transparent;
+        --background: var(--ion-background-color);
       }
       .count-badge {
         font-weight: 400;
