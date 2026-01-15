@@ -258,9 +258,9 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
       }
 
       ion-toolbar::part(background) {
-        background: rgba(var(--ion-background-color-rgb), 0.7);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+        background: var(--glass-bg);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
       }
 
       .header-inner {
@@ -400,13 +400,14 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         position: sticky;
         top: 0;
         z-index: 50;
-        background: rgba(var(--ion-background-color-rgb), 0.7);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+        background: var(--glass-bg);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
 
         padding-top: 10px;
         padding-bottom: 10px;
-        border-bottom: 1px solid transparent;
+        border-top: none;
+        border-bottom: none;
         transition: all 0.3s;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
         /* PERFORMANCE: Báo trước trình duyệt */

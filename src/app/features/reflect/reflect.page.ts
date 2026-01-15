@@ -215,9 +215,20 @@ type FilterType = 'PENDING' | 'REVIEWED';
   styles: [
     `
       /* --- HEADER & SEGMENT --- */
-      ion-toolbar {
-        --background: var(--ion-background-color);
+      ion-header {
+        border: none !important;
       }
+      ion-toolbar {
+        --background: transparent;
+        --border-width: 0;
+      }
+
+      ion-toolbar::part(background) {
+        background: var(--glass-bg);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+      }
+
       .count-badge {
         font-weight: 400;
         opacity: 0.7;

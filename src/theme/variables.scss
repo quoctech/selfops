@@ -82,6 +82,9 @@
     --ion-color-light-contrast-rgb: 0, 0, 0;
     --ion-color-light-shade: #d4d8db;
     --ion-color-light-tint: #f2f6fa;
+
+    --glass-bg: rgba(255, 255, 255, 0.75);
+    --glass-blur: blur(20px);
 }
 
 /* ==================================================
@@ -146,6 +149,9 @@ body.dark {
     --ion-color-step-850: #d8d8d4;
     --ion-color-step-900: #e4e4e0;
     --ion-color-step-950: #f0f0ec;
+
+    --glass-bg: rgba(9, 9, 11, 0.55);
+    --glass-blur: blur(16px);
 }
 
 /* ==================================================
