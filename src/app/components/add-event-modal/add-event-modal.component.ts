@@ -78,7 +78,7 @@ const EMOTION_CHIPS = [
     IonSpinner,
   ],
   template: `
-    <ion-header class="ion-no-border">
+    <ion-header class="ion-padding ion-no-border">
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button color="medium" (click)="cancel()">
@@ -86,7 +86,7 @@ const EMOTION_CHIPS = [
           </ion-button>
         </ion-buttons>
 
-        <ion-title>Nhật ký hôm nay</ion-title>
+        <ion-title>Ghi nhận sự kiện</ion-title>
 
         <ion-buttons slot="end">
           <ion-button
@@ -167,8 +167,6 @@ const EMOTION_CHIPS = [
   `,
   styles: [
     `
-      /* === OPTIMIZED CSS === */
-
       /* Utilities */
       .custom-spinner {
         width: 24px;
@@ -180,12 +178,15 @@ const EMOTION_CHIPS = [
 
       /* Segment */
       .segment-container {
-        margin-bottom: 24px;
-        padding: 4px;
-        background: var(--ion-color-light);
-        border-radius: 12px;
-        /* Performance: Giúp trình duyệt paint riêng layer này */
-        contain: content;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        padding-bottom: 16px;
+        background: var(--ion-background-color);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        will-change: transform;
+        transition: background-color 0.3s ease;
       }
 
       ion-segment-button {
