@@ -108,7 +108,7 @@ export class EventRepository {
       const params: any[] = [];
 
       if (filterType && filterType !== 'ALL') {
-        query += ' WHERE type = ?';
+        query += ' AND type = ?';
         params.push(filterType);
       }
 
