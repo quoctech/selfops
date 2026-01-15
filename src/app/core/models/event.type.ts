@@ -30,7 +30,7 @@ export const EVENT_CONFIG = {
     color: 'primary',
   },
   [SelfOpsEventType.MISTAKE]: {
-    label: 'Sự cố / Bài học',
+    label: 'Bài học',
     icon: 'alert-circle-outline',
     color: 'danger',
   },
