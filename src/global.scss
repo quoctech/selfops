@@ -130,32 +130,3 @@ html,
 body {
     background-color: var(--ion-background-color);
 }
-
-/* * FIX ION-CONTENT FLASH 
- * Ép ion-content và Shadow DOM của nó phải dùng màu nền từ biến ngay lập tức
- * Dùng !important để override mọi trạng thái mặc định
- */
-ion-content {
-    --background: var(--ion-background-color) !important;
-    background-color: var(--ion-background-color) !important;
-}
-
-ion-content::part(background) {
-    background-color: var(--ion-background-color) !important;
-}
-
-/* Fallback ép cứng màu nếu biến chưa load kịp (Cho chắc ăn) */
-body.dark ion-content,
-body.dark ion-content::part(background) {
-    background-color: #09090b !important;
-    --background: #09090b !important;
-}
-
-@media (prefers-color-scheme: dark) {
-
-    ion-content,
-    ion-content::part(background) {
-        background-color: #09090b !important;
-        --background: #09090b !important;
-    }
-}

@@ -195,15 +195,13 @@ body.dark ion-header {
 
 /* 2. Xử lý Toolbar (Thanh công cụ bên trong) */
 body.dark ion-header ion-toolbar {
-    /* Màu nền bán trong suốt (Deep Carbon với 85% opacity) */
-    /* Phải dùng rgba, không dùng hex thì mới xuyên thấu được */
-    --background: rgba(9, 9, 11, 0.85);
-
-    /* Màu chữ */
     --color: var(--ion-text-color);
     --border-color: transparent;
-    /* Xóa viền riêng của toolbar để dùng viền của header */
+}
 
+body.dark ion-header ion-toolbar::part(background) {
+    /* Màu nền bán trong suốt (Deep Carbon với 70% opacity) */
+    background: rgba(9, 9, 11, 0.7);
     /* Hiệu ứng mờ (Blur) nội dung bên dưới */
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
