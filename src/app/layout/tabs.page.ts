@@ -1,5 +1,5 @@
-import { AsyncPipe } from '@angular/common'; // 👈 1. Import AsyncPipe
-import { Component, inject } from '@angular/core';
+import { AsyncPipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import {
   IonBadge,
   IonIcon,
@@ -10,11 +10,12 @@ import {
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { listOutline, repeatOutline, settingsOutline } from 'ionicons/icons';
-import { DatabaseService } from 'src/app/core/services/database/database.service'; // 👈 3. Import Service
+import { DatabaseService } from 'src/app/core/services/database/database.service';
 
 @Component({
   selector: 'app-tabs',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     IonTabs,
     IonTabBar,
@@ -22,7 +23,7 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
     IonIcon,
     IonLabel,
     IonBadge,
-    AsyncPipe, // 👈 Khai báo import
+    AsyncPipe,
   ],
   template: `
     <ion-tabs>
@@ -58,7 +59,7 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
         --background: var(--ion-background-color);
         --border-color: var(--ion-color-step-150);
         padding-top: 5px;
-        height: 60px; /* Fix chiều cao cố định cho chuẩn */
+        height: 60px;
         backdrop-filter: blur(10px);
         background: rgba(var(--ion-background-color-rgb), 0.85);
         border-top: 0.5px solid var(--ion-color-step-150);
@@ -107,7 +108,6 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
   ],
 })
 export class TabsPage {
-  // Inject Service
   private db = inject(DatabaseService);
 
   // Lấy Stream số lượng

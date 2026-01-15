@@ -89,11 +89,11 @@
    ================================================== */
 body.dark {
     /* --- MÀU CỐT LÕI (High Contrast & Deep) --- */
-    /* Nền đen sâu (Zinc 950), không dùng đen tuyệt đối để đỡ chói */
+    /* Nền đen sâu (Zinc 950) */
     --ion-background-color: #09090b;
     --ion-background-color-rgb: 9, 9, 11;
 
-    /* Chữ trắng ngà, sang hơn trắng tinh */
+    /* Chữ trắng ngà */
     --ion-text-color: #f4f4f5;
     --ion-text-color-rgb: 244, 244, 245;
 
@@ -101,12 +101,10 @@ body.dark {
     --ion-border-color: rgba(255, 255, 255, 0.12);
 
     /* --- MÀU KHỐI (Zinc 900) --- */
-    /* Nền Card sáng hơn nền App một chút để tạo độ nổi */
     --ion-item-background: #18181b;
     --ion-card-background: #18181b;
 
-    /* --- TINH CHỈNH MÀU ACCENT (Vivid & Neon) --- */
-    /* Primary: Electric Blue - Sáng rực trên nền đen */
+    /* --- TINH CHỈNH MÀU ACCENT --- */
     --ion-color-primary: #3b82f6;
     --ion-color-primary-rgb: 59, 130, 246;
     --ion-color-primary-contrast: #ffffff;
@@ -114,7 +112,6 @@ body.dark {
     --ion-color-primary-shade: #3472d8;
     --ion-color-primary-tint: #4f8ef7;
 
-    /* Secondary: Cyan/Teal - Tạo cảm giác công nghệ */
     --ion-color-secondary: #06b6d4;
     --ion-color-secondary-rgb: 6, 182, 212;
     --ion-color-secondary-contrast: #ffffff;
@@ -122,23 +119,14 @@ body.dark {
     --ion-color-secondary-shade: #05a0bb;
     --ion-color-secondary-tint: #1fd6f5;
 
-    /* Các màu trạng thái dịu mắt hơn (Pastel trên nền tối) */
+    /* Màu trạng thái pastel */
     --ion-color-success: #4ade80;
-    /* Green 400 */
     --ion-color-warning: #facc15;
-    /* Yellow 400 */
     --ion-color-danger: #fb7185;
-    /* Rose 400 */
-
     --ion-color-medium: #a1a1aa;
-    /* Zinc 400 - Màu chữ phụ */
     --ion-color-light: #27272a;
-    /* Zinc 800 - Dùng cho input/hover */
 
-    /* --- BƯỚC MÀU (STEP COLORS) --- 
-   * Đã được tính toán lại dựa trên nền #09090b 
-   * Giúp các trạng thái hover/active mượt mà, không bị lệch tông
-   */
+    /* --- BƯỚC MÀU (STEP COLORS) --- */
     --ion-color-step-50: #151517;
     --ion-color-step-100: #212123;
     --ion-color-step-150: #2d2d2f;
@@ -164,47 +152,57 @@ body.dark {
    3. GLOBAL COMPONENT STYLES (Refined)
    ================================================== */
 
-/* Card chung */
+/* --- CARD --- */
 ion-card {
     border-radius: 16px;
-    /* Light mode: Bóng đổ mềm */
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     transition: all 0.3s ease;
     overflow: hidden;
-    /* Bo góc ảnh nếu có */
 }
 
-/* Style riêng cho Dark Mode - PREMIUM LOOK */
 body.dark ion-card {
-    /* Tắt bóng đổ (vì nền đen bóng đổ nhìn rất bẩn) */
     box-shadow: none;
-
-    /* Thêm viền mỏng tinh tế */
     border: 1px solid var(--ion-border-color);
-
-    /* Background hơi sáng hơn nền app một chút */
     background: var(--ion-card-background);
 }
 
-/* Tinh chỉnh Item trong List */
+/* --- ITEM --- */
 body.dark ion-item {
     --background: var(--ion-item-background);
     --border-color: var(--ion-border-color);
 }
 
-/* Tinh chỉnh Modal/Alert/Action Sheet */
+/* --- MODAL / ALERT / SHEET --- */
 body.dark ion-modal,
 body.dark ion-action-sheet,
 body.dark ion-alert {
     --background: #18181b;
-    /* Zinc 900 */
 }
 
-/* Tinh chỉnh Toolbar/Header để không bị lì */
+/* --- HEADER & TOOLBAR (PREMIUM GLASS EFFECT) --- */
+
+/* 1. Xử lý khung Header */
+body.dark ion-header {
+    /* Xóa bóng đổ mặc định của Material Design để nhìn phẳng */
+    box-shadow: none;
+
+    /* Thêm đường kẻ mỏng bên dưới để tách biệt nội dung (quan trọng cho hiệu ứng kính) */
+    border-bottom: 1px solid var(--ion-border-color);
+
+    /* Đảm bảo background của header container trong suốt để toolbar hiện màu */
+    background: transparent;
+}
+
+/* 2. Xử lý Toolbar (Thanh công cụ bên trong) */
 body.dark ion-header ion-toolbar {
-    --background: rgba(9, 9, 11, 0.85);
-    /* Hiệu ứng kính mờ */
-    --border-color: var(--ion-border-color);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    --color: var(--ion-text-color);
+    --border-color: transparent;
+}
+
+body.dark ion-header ion-toolbar::part(background) {
+    /* Màu nền bán trong suốt (Deep Carbon với 70% opacity) */
+    background: rgba(9, 9, 11, 0.7);
+    /* Hiệu ứng mờ (Blur) nội dung bên dưới */
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
 }

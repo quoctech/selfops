@@ -66,8 +66,8 @@ type FilterType = 'PENDING' | 'REVIEWED';
     IonLabel,
   ],
   template: `
-    <ion-header [translucent]="true" class="ion-no-border">
-      <ion-toolbar>
+    <ion-header class="ion-no-border">
+      <ion-toolbar class="ion-padding">
         <ion-title>
           Góc nhìn lại @if (totalPendingBadge() > 0) {
           <span class="count-badge">({{ totalPendingBadge() }})</span>
@@ -216,7 +216,7 @@ type FilterType = 'PENDING' | 'REVIEWED';
     `
       /* --- HEADER & SEGMENT --- */
       ion-toolbar {
-        --background: var(--ion-background-color);
+        --background: transparent;
       }
       .count-badge {
         font-weight: 400;

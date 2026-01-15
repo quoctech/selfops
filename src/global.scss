@@ -1,12 +1,6 @@
 /*
  * App Global CSS
  * ----------------------------------------------------------------------------
- * Put style rules here that you want to apply globally. These styles are for
- * the entire app and not just one component. Additionally, this file can be
- * used as an entry point to import other CSS/Sass files to be included in the
- * output CSS.
- * For more information on global stylesheets, visit the documentation:
- * https://ionicframework.com/docs/layout/global-stylesheets
  */
 
 /* Core CSS required for Ionic components to work properly */
@@ -18,41 +12,121 @@
 @import "@ionic/angular/css/typography.css";
 @import "@ionic/angular/css/display.css";
 
-/* Optional CSS utils that can be commented out */
+/* Optional CSS utils */
 @import "@ionic/angular/css/padding.css";
 @import "@ionic/angular/css/float-elements.css";
 @import "@ionic/angular/css/text-alignment.css";
 @import "@ionic/angular/css/text-transformation.css";
 @import "@ionic/angular/css/flex-utils.css";
 
-/**
- * Ionic Dark Mode
- * -----------------------------------------------------
- * For more info, please see:
- * https://ionicframework.com/docs/theming/dark-mode
- */
-
-/* @import "@ionic/angular/css/palettes/dark.always.css"; */
-/* @import "@ionic/angular/css/palettes/dark.class.css"; */
+/* Import Dark Mode System */
 @import '@ionic/angular/css/palettes/dark.system.css';
 
-/* FIX WHITE FLASH KEYBOARD */
-/* 1. Mặc định (Light Mode) */
-html,
-body {
-    background-color: #f8fafc;
-    /* Slate 50 - Trùng màu nền light */
+/* ==============================================
+   1. THEME DEFINITION - LIGHT MODE (Mặc định)
+   ============================================== */
+:root {
+    /** 🔥 RGB VARS (Bắt buộc cho Glass Effect) **/
+    --ion-background-color: #f8fafc;
+    --ion-background-color-rgb: 248, 250, 252;
+
+    --ion-text-color: #0f172a;
+    --ion-text-color-rgb: 15, 23, 42;
+
+    --ion-item-background: #ffffff;
+    --ion-card-background: #ffffff;
+    --ion-border-color: #e2e8f0;
+
+    /* Primary Blue */
+    --ion-color-primary: #2563eb;
+    --ion-color-primary-rgb: 37, 99, 235;
+    --ion-color-primary-contrast: #ffffff;
+    --ion-color-primary-contrast-rgb: 255, 255, 255;
+    --ion-color-primary-shade: #2056ce;
+    --ion-color-primary-tint: #3b73ef;
+
+    /* Status Colors */
+    --ion-color-danger: #eb445a;
+    --ion-color-danger-rgb: 235, 68, 90;
+    --ion-color-warning: #ffc409;
+    --ion-color-warning-rgb: 255, 196, 9;
+    --ion-color-warning-shade: #e0ac08;
 }
 
-/* 2. Khi có class .dark (Do người dùng bật trong App) */
+/* ==============================================
+   2. THEME DEFINITION - DARK MODE
+   ============================================== */
+
+/* Cách 1: Khi body có class .dark (Do Ionic thêm vào hoặc user toggle) */
 body.dark {
-    background-color: #09090b;
-    /* Deep Carbon - Trùng màu nền dark */
+    --ion-background-color: #09090b;
+    --ion-background-color-rgb: 9, 9, 11;
+
+    --ion-text-color: #f4f4f5;
+    --ion-text-color-rgb: 244, 244, 245;
+
+    --ion-border-color: rgba(255, 255, 255, 0.12);
+    --ion-item-background: #18181b;
+    --ion-card-background: #18181b;
+
+    --ion-color-primary: #3b82f6;
+    --ion-color-primary-rgb: 59, 130, 246;
+    --ion-color-primary-shade: #3472d8;
+    --ion-color-primary-tint: #4f8ef7;
+
+    /* Steps color */
+    --ion-color-step-50: #151517;
+    --ion-color-step-100: #212123;
+    --ion-color-step-150: #2d2d2f;
+    --ion-color-step-200: #3a3a3b;
+    --ion-color-step-250: #464647;
+    --ion-color-step-300: #525254;
+    --ion-color-step-350: #5e5e60;
+    --ion-color-step-400: #6a6a6c;
+    --ion-color-step-450: #767678;
+    --ion-color-step-500: #838384;
+    --ion-color-step-550: #8f8f90;
+    --ion-color-step-600: #9b9b9c;
+    --ion-color-step-650: #a7a7a9;
+    --ion-color-step-700: #b3b3b5;
+    --ion-color-step-750: #bfbfb1;
+    --ion-color-step-800: #ccccc8;
+    --ion-color-step-850: #d8d8d4;
+    --ion-color-step-900: #e4e4e0;
+    --ion-color-step-950: #f0f0ec;
 }
 
-/* 3. Khi Hệ điều hành đang ở Dark Mode (Lúc mới mở App chưa load xong JS) */
+/* Cách 2: Khi Hệ điều hành là Dark Mode (Load trước khi JS chạy để chống chớp trắng) */
 @media (prefers-color-scheme: dark) {
     body {
-        background-color: #09090b;
+        --ion-background-color: #09090b;
+        --ion-background-color-rgb: 9, 9, 11;
+
+        --ion-text-color: #f4f4f5;
+        --ion-text-color-rgb: 244, 244, 245;
+        --ion-border-color: rgba(255, 255, 255, 0.12);
+        --ion-item-background: #18181b;
+        --ion-card-background: #18181b;
+
+        --ion-color-primary: #3b82f6;
+        --ion-color-primary-rgb: 59, 130, 246;
+        --ion-color-primary-shade: #3472d8;
+        --ion-color-primary-tint: #4f8ef7;
+
+        /* Steps color backup */
+        --ion-color-step-50: #151517;
+        --ion-color-step-100: #212123;
+        --ion-color-step-150: #2d2d2f;
+        /* ... có thể thêm các step khác nếu cần thiết lúc load app */
     }
+}
+
+/* ==============================================
+   3. FIX WHITE FLASH (Hardcore Mode)
+   ============================================== */
+
+/* Ép màu nền cho Body ngay lập tức */
+html,
+body {
+    background-color: var(--ion-background-color);
 }

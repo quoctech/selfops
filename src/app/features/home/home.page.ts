@@ -77,11 +77,8 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
     DailyCheckInComponent,
   ],
   template: `
-    <ion-header
-      [translucent]="true"
-      class="ion-padding ion-no-border main-header"
-    >
-      <ion-toolbar>
+    <ion-header class="ion-no-border">
+      <ion-toolbar class="ion-padding">
         <div class="header-inner ion-padding-horizontal">
           <div class="brand-section">
             <h1 class="brand-title">
@@ -250,15 +247,19 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
   styles: [
     `
       /* --- HEADER & BRANDING --- */
+      ion-header {
+        background: transparent;
+      }
+
       ion-toolbar {
         --background: transparent;
+        --border-width: 0;
       }
-      .main-header {
-        /* Fallback color cho máy yếu */
-        background: var(--ion-background-color);
-        background: rgba(var(--ion-background-color-rgb), 0.85);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+
+      ion-toolbar::part(background) {
+        background: rgba(var(--ion-background-color-rgb), 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
       }
 
       .header-inner {
@@ -398,9 +399,10 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         position: sticky;
         top: 0;
         z-index: 50;
-        background: rgba(var(--ion-background-color-rgb), 0.96);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
+        background: rgba(var(--ion-background-color-rgb), 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+
         padding-top: 10px;
         padding-bottom: 10px;
         border-bottom: 1px solid transparent;
