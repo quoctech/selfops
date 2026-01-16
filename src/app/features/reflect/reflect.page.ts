@@ -1,3 +1,7 @@
+import {
+  CdkVirtualScrollViewport,
+  ScrollingModule,
+} from '@angular/cdk/scrolling';
 import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -12,15 +16,11 @@ import {
   IonContent,
   IonHeader,
   IonIcon,
-  IonInfiniteScroll,
-  IonInfiniteScrollContent,
   IonLabel,
-  IonRefresher,
-  IonRefresherContent,
   IonRippleEffect,
   IonSegment,
   IonSegmentButton,
-  IonSkeletonText,
+  IonSpinner,
   IonTitle,
   IonToolbar,
   ModalController,
@@ -29,10 +29,9 @@ import {
 import { addIcons } from 'ionicons';
 import {
   arrowForwardOutline,
-  bulbOutline,
+  calendarClearOutline,
   checkmarkDoneOutline,
   fileTrayFullOutline,
-  timeOutline,
   trophyOutline,
 } from 'ionicons/icons';
 import { EventDetailModalComponent } from 'src/app/components/event-detail-modal/event-detail-modal.component';
@@ -49,28 +48,27 @@ type FilterType = 'PENDING' | 'REVIEWED';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
+    ScrollingModule,
     IonHeader,
     IonToolbar,
     IonTitle,
     IonContent,
-    IonRefresher,
-    IonRefresherContent,
-    IonInfiniteScroll,
-    IonInfiniteScrollContent,
     IonBadge,
     IonIcon,
     IonRippleEffect,
-    IonSkeletonText,
+    IonSpinner,
     IonSegment,
     IonSegmentButton,
     IonLabel,
   ],
   template: `
-    <ion-header class="ion-no-border">
-      <ion-toolbar class="ion-padding">
-        <ion-title>
+    <ion-header class="ion-no-border native-glass-header">
+      <div class="glass-pane"></div>
+
+      <ion-toolbar class="title-toolbar">
+        <ion-title class="page-title">
           Góc nhìn lại @if (totalPendingBadge() > 0) {
-          <span class="count-badge">({{ totalPendingBadge() }})</span>
+          <span class="count-badge">{{ totalPendingBadge() }}</span>
           }
         </ion-title>
       </ion-toolbar>
@@ -80,317 +78,387 @@ type FilterType = 'PENDING' | 'REVIEWED';
           [value]="filterStatus()"
           (ionChange)="onFilterChange($event)"
           mode="ios"
+          class="custom-segment"
         >
           <ion-segment-button value="PENDING">
-            <ion-label>Chưa review</ion-label>
+            <ion-label>Chờ Review</ion-label>
           </ion-segment-button>
           <ion-segment-button value="REVIEWED">
-            <ion-label>Đã review</ion-label>
+            <ion-label>Đã Review</ion-label>
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
     </ion-header>
 
-    <ion-content [fullscreen]="true" class="ion-padding-horizontal">
-      <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
-        <ion-refresher-content></ion-refresher-content>
-      </ion-refresher>
+    <ion-content [scrollY]="false" [fullscreen]="true" class="main-content">
+      <div class="layout-container">
+        <div class="header-spacer"></div>
 
-      @if (isLoading()) {
-      <div class="list-container">
-        @for (i of [1,2,3,4,5]; track i) {
-        <div class="reflect-card skeleton-card">
-          <div class="card-top">
-            <ion-skeleton-text
-              animated
-              style="width: 60px; height: 20px; border-radius: 4px;"
-            ></ion-skeleton-text>
-            <ion-skeleton-text
-              animated
-              style="width: 40px; height: 16px;"
-            ></ion-skeleton-text>
-          </div>
-          <div class="card-body">
-            <ion-skeleton-text
-              animated
-              style="width: 100%; height: 16px; margin-bottom: 6px;"
-            ></ion-skeleton-text>
-            <ion-skeleton-text
-              animated
-              style="width: 80%; height: 16px;"
-            ></ion-skeleton-text>
-          </div>
+        @if (isLoading()) {
+        <div class="center-state">
+          <ion-spinner name="crescent" color="primary"></ion-spinner>
         </div>
-        }
-      </div>
-      } @else if (displayList().length === 0) {
-      <div class="empty-state fade-in">
-        <div class="illustration">
-          <ion-icon
-            [name]="
+        } @else if (displayList().length === 0) {
+        <div class="center-state fade-in">
+          <div class="illustration-circle">
+            <ion-icon
+              [name]="
+                filterStatus() === 'PENDING'
+                  ? 'checkmark-done-outline'
+                  : 'file-tray-full-outline'
+              "
+            ></ion-icon>
+          </div>
+          <h3>
+            {{
+              filterStatus() === 'PENDING' ? 'Tuyệt vời!' : 'Chưa có lịch sử'
+            }}
+          </h3>
+          <p>
+            {{
               filterStatus() === 'PENDING'
-                ? 'bulb-outline'
-                : 'file-tray-full-outline'
-            "
-          ></ion-icon>
+                ? 'Bạn đã hoàn thành việc review tất cả sự kiện.'
+                : 'Các bài học sau khi review sẽ xuất hiện tại đây.'
+            }}
+          </p>
         </div>
-        <h3>
-          {{
-            filterStatus() === 'PENDING'
-              ? 'Tâm trí thảnh thơi'
-              : 'Chưa có bài học nào'
-          }}
-        </h3>
-        <p>
-          {{
-            filterStatus() === 'PENDING'
-              ? 'Bạn đã hoàn thành tất cả các bài học.'
-              : 'Hãy review các sự kiện để lưu lại bài học.'
-          }}
-        </p>
-      </div>
-      } @else {
-      <div class="list-container fade-in">
-        @for (evt of displayList(); track evt.uuid) {
-        <div
-          class="reflect-card ion-activatable ripple-parent"
-          [class.reviewed-card]="filterStatus() === 'REVIEWED'"
-          (click)="openReflectModal(evt)"
+        } @else {
+        <cdk-virtual-scroll-viewport
+          itemSize="170"
+          minBufferPx="400"
+          maxBufferPx="800"
+          class="custom-viewport"
+          (scrolledIndexChange)="onScrollIndexChange($event)"
         >
-          <ion-ripple-effect></ion-ripple-effect>
+          <div class="list-spacer-top"></div>
 
-          <div class="card-top">
-            <ion-badge [color]="getTypeColor(evt.type)" mode="ios">
-              {{ getTypeLabel(evt.type) }}
-            </ion-badge>
+          <div
+            *cdkVirtualFor="let evt of displayList(); trackBy: trackByFn"
+            class="list-item-wrapper"
+          >
+            <div
+              class="reflect-card ion-activatable ripple-parent"
+              [class.reviewed-card]="filterStatus() === 'REVIEWED'"
+              (click)="openReflectModal(evt)"
+            >
+              <div class="card-top">
+                <ion-badge
+                  [color]="getTypeConfig(evt.type).color"
+                  mode="ios"
+                  class="type-badge"
+                >
+                  {{ getTypeConfig(evt.type).label }}
+                </ion-badge>
 
-            @if (filterStatus() === 'PENDING') {
-            <div class="due-date pending">
-              <ion-icon name="time-outline"></ion-icon>
-              <span>{{ evt.review_due_date | date : 'dd/MM' }}</span>
+                @if (filterStatus() === 'PENDING') {
+                <div class="date-capsule pending">
+                  <ion-icon name="calendar-clear-outline"></ion-icon>
+                  <span>Viết ngày {{ evt.created_at | date : 'dd/MM' }}</span>
+                </div>
+                } @else {
+                <div class="date-capsule reviewed">
+                  <ion-icon name="checkmark-done-outline"></ion-icon>
+                  <span
+                    >Xong ngày
+                    {{
+                      evt.updated_at || evt.created_at | date : 'dd/MM'
+                    }}</span
+                  >
+                </div>
+                }
+              </div>
+
+              <div class="card-body">
+                <p class="context text-truncate">
+                  {{ evt.context }}
+                </p>
+              </div>
+
+              <div class="card-footer">
+                @if (filterStatus() === 'PENDING') {
+                <span class="cta-text">Nhìn lại ngay</span>
+                <ion-icon name="arrow-forward-outline"></ion-icon>
+                } @else {
+                <span class="cta-text reviewed-text">Xem bài học</span>
+                <ion-icon name="trophy-outline"></ion-icon>
+                }
+              </div>
+              <ion-ripple-effect></ion-ripple-effect>
             </div>
-            } @else {
-            <div class="due-date reviewed">
-              <ion-icon name="checkmark-done-outline"></ion-icon>
-              <span>{{
-                evt.updated_at || evt.created_at | date : 'dd/MM'
-              }}</span>
-            </div>
-            }
           </div>
 
-          <div class="card-body">
-            <p class="context truncate-text">
-              {{ evt.context }}
-            </p>
+          @if (isLoadingMore()) {
+          <div class="footer-loader">
+            <ion-spinner name="dots" color="medium"></ion-spinner>
           </div>
-
-          <div class="card-footer">
-            @if (filterStatus() === 'PENDING') {
-            <span class="cta-text">Viết bài học</span>
-            <ion-icon name="arrow-forward-outline"></ion-icon>
-            } @else {
-            <span class="cta-text reviewed-text">Xem lại bài học</span>
-            <ion-icon name="trophy-outline"></ion-icon>
-            }
-          </div>
-        </div>
+          }
+          <div style="height: 40px"></div>
+        </cdk-virtual-scroll-viewport>
         }
       </div>
-
-      <ion-infinite-scroll
-        threshold="100px"
-        (ionInfinite)="onIonInfinite($event)"
-        [disabled]="isEndOfData()"
-      >
-        <ion-infinite-scroll-content
-          loadingSpinner="bubbles"
-          loadingText="Đang tải thêm..."
-        >
-        </ion-infinite-scroll-content>
-      </ion-infinite-scroll>
-      }
     </ion-content>
   `,
   styles: [
     `
-      /* --- HEADER & SEGMENT --- */
-      ion-header {
-        border: none !important;
+      /* =========================================
+         1. GLOBAL & VARIABLES
+      ========================================= */
+      :host {
+        /* Tính toán chiều cao Header */
+        --title-height: 56px;
+        --segment-height: 52px; /* 44px height + 8px padding-bottom */
+
+        /* Tổng chiều cao Header bao gồm Safe Area */
+        --header-offset: calc(
+          var(--ion-safe-area-top, 0px) + var(--title-height) +
+            var(--segment-height)
+        );
       }
-      ion-toolbar {
+
+      .main-content {
+        --background: var(--ion-background-color);
+      }
+
+      .layout-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: var(--ion-background-color);
+        transform: translateZ(0); /* GPU Layer */
+      }
+
+      /* =========================================
+         2. HEADER (GLASS & GPU)
+      ========================================= */
+      .native-glass-header {
+        position: absolute;
+        inset: 0;
+        bottom: auto;
+        z-index: 999;
+        pointer-events: none;
+        transform: translateZ(0);
+        will-change: transform;
+      }
+
+      .native-glass-header ion-toolbar {
+        pointer-events: auto;
         --background: transparent;
         --border-width: 0;
       }
 
-      ion-toolbar::part(background) {
-        background: var(--glass-bg);
-        backdrop-filter: var(--glass-blur);
-        -webkit-backdrop-filter: var(--glass-blur);
+      /* Toolbar 1: Title (Có padding top cho Safe Area) */
+      .title-toolbar {
+        padding-top: var(--ion-safe-area-top, 0px);
+        --min-height: var(--title-height);
+      }
+
+      /* Toolbar 2: Segment */
+      .segment-toolbar {
+        --min-height: var(--segment-height);
+        padding: 0 16px 8px 16px;
+      }
+
+      .glass-pane {
+        position: absolute;
+        inset: 0;
+        background: var(--glass-bg-light);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--ion-color-light-shade);
+        /* Luôn hiện (hoặc xử lý scroll opacity nếu muốn) */
+      }
+
+      .page-title {
+        font-weight: 800;
+        font-size: 1.4rem;
+        color: var(--ion-text-color);
+        padding-inline: 16px;
       }
 
       .count-badge {
-        font-weight: 400;
-        opacity: 0.7;
-        font-size: 0.9em;
+        background: var(--ion-color-danger);
+        color: white;
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 12px;
+        vertical-align: middle;
+        margin-left: 4px;
+        font-weight: 700;
+        transform: translateY(-2px);
+        display: inline-block;
       }
-      .segment-toolbar {
-        padding: 0 16px 8px 16px;
-        --min-height: auto;
-      }
-      ion-segment {
-        background: var(--ion-item-background);
+
+      .custom-segment {
+        background: var(--ion-color-light);
         border-radius: 12px;
         padding: 4px;
         height: 44px;
+        --background: var(--ion-color-light);
       }
       ion-segment-button {
-        --indicator-color: var(--ion-color-light);
+        --indicator-color: var(--ion-card-background);
         --color: var(--ion-color-medium);
         --color-checked: var(--ion-text-color);
         --border-radius: 8px;
         font-weight: 600;
         min-height: 36px;
-      }
-      /* Style riêng cho tab Đã review khi active */
-      ion-segment-button[value='REVIEWED'][class*='segment-button-checked'] {
-        --color-checked: var(--ion-color-success);
-        --indicator-color: rgba(var(--ion-color-success-rgb), 0.1);
+        --box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
       }
 
-      /* --- LIST CONTAINER --- */
-      .list-container {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        padding-top: 16px;
-        padding-bottom: 30px;
+      /* =========================================
+         3. CONTENT & VIRTUAL SCROLL
+      ========================================= */
+
+      /* Spacer đẩy content xuống đúng chiều cao Header */
+      .header-spacer {
+        height: var(--header-offset);
+        flex-shrink: 0;
+        background: transparent;
       }
 
-      /* --- CARD DESIGN --- */
+      .custom-viewport {
+        height: 100%;
+        width: 100%;
+      }
+      .list-spacer-top {
+        height: 16px;
+      }
+      .list-item-wrapper {
+        padding: 0 16px 16px 16px;
+      }
+
+      /* =========================================
+         4. CARD DESIGN (PERFORMANCE)
+      ========================================= */
       .reflect-card {
         background: var(--ion-card-background);
-        border-radius: 18px;
+        border-radius: 20px;
         padding: 16px;
+        height: 154px; /* Fixed height for CDK efficiency */
         position: relative;
         overflow: hidden;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-        border: 1px solid var(--ion-color-light-shade);
+        border: 1px solid var(--ion-border-color);
+        display: flex;
+        flex-direction: column;
         transition: transform 0.1s;
+
+        /* Optimization */
+        contain: content;
+        transform: translateZ(0);
       }
       .reflect-card:active {
         transform: scale(0.98);
       }
-
-      /* Reviewed Card Style (Nhẹ nhàng hơn) */
-      .reflect-card.reviewed-card {
-        border-color: rgba(var(--ion-color-success-rgb), 0.2);
-        background: linear-gradient(
-          to bottom right,
-          var(--ion-card-background),
-          rgba(var(--ion-color-success-rgb), 0.03)
-        );
+      .reviewed-card {
+        border-color: rgba(var(--ion-color-success-rgb), 0.3);
       }
 
       .card-top {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
+        height: 24px;
+      }
+      .type-badge {
+        font-weight: 700;
+        padding: 6px 10px;
+        font-size: 0.7rem;
+        border-radius: 8px;
+        text-transform: uppercase;
       }
 
-      /* Date Badges */
-      .due-date {
-        font-size: 0.8rem;
+      .date-capsule {
+        font-size: 0.75rem;
         font-weight: 600;
         display: flex;
         align-items: center;
         gap: 4px;
-        padding: 4px 10px;
-        border-radius: 20px;
+        color: var(--ion-color-medium);
       }
-      .due-date.pending {
-        color: var(--ion-color-danger);
-        background: rgba(var(--ion-color-danger-rgb), 0.08);
-      }
-      .due-date.reviewed {
+      .date-capsule.reviewed {
         color: var(--ion-color-success);
-        background: rgba(var(--ion-color-success-rgb), 0.1);
+        font-weight: 700;
       }
 
       .card-body {
-        margin-bottom: 16px;
+        flex: 1;
+        overflow: hidden;
+        margin-bottom: 8px;
       }
       .context {
-        font-size: 1.05rem;
+        font-size: 0.95rem;
         line-height: 1.5;
         color: var(--ion-text-color);
         margin: 0;
+        font-weight: 500;
         display: -webkit-box;
         -webkit-line-clamp: 3;
         -webkit-box-orient: vertical;
         overflow: hidden;
       }
 
-      /* Footer & CTA */
       .card-footer {
         display: flex;
         justify-content: flex-end;
         align-items: center;
         gap: 6px;
-        border-top: 1px dashed var(--ion-color-light-shade);
-        padding-top: 12px;
+        padding-top: 10px;
+        border-top: 1px dashed var(--ion-border-color);
         color: var(--ion-color-primary);
-        font-weight: 600;
-        font-size: 0.9rem;
+        font-weight: 700;
+        font-size: 0.85rem;
+        height: 30px;
       }
-      .cta-text.reviewed-text {
-        color: var(--ion-color-success);
-      }
-      .reflect-card.reviewed-card ion-icon {
+      .reviewed-card .card-footer {
         color: var(--ion-color-success);
       }
 
-      /* --- EMPTY STATE --- */
-      .empty-state {
+      /* =========================================
+         5. STATES
+      ========================================= */
+      .center-state {
+        height: 60vh;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 60vh;
         text-align: center;
-        padding: 20px;
+        padding: 0 32px;
       }
-      .empty-state .illustration {
-        font-size: 56px;
-        color: var(--ion-color-medium);
-        margin-bottom: 16px;
-        background: var(--ion-color-light);
+      .illustration-circle {
+        width: 80px;
+        height: 80px;
         border-radius: 50%;
-        width: 100px;
-        height: 100px;
+        background: var(--ion-color-light);
+        color: var(--ion-color-medium);
         display: flex;
         align-items: center;
         justify-content: center;
+        font-size: 2.5rem;
+        margin-bottom: 16px;
       }
-      .empty-state h3 {
+      .center-state h3 {
+        margin: 0 0 8px 0;
         font-size: 1.2rem;
-        font-weight: 700;
+        font-weight: 800;
         color: var(--ion-text-color);
-        margin-bottom: 8px;
       }
-      .empty-state p {
+      .center-state p {
         color: var(--ion-color-medium);
         font-size: 0.95rem;
+        line-height: 1.5;
       }
 
-      /* SKELETON */
-      .skeleton-card {
-        border-color: transparent;
-        box-shadow: none;
-        background: var(--ion-item-background);
+      .footer-loader {
+        display: flex;
+        justify-content: center;
+        padding: 8px;
       }
-
+      .fade-in {
+        animation: fadeIn 0.3s ease-out forwards;
+      }
       @keyframes fadeIn {
         from {
           opacity: 0;
@@ -401,8 +469,22 @@ type FilterType = 'PENDING' | 'REVIEWED';
           transform: translateY(0);
         }
       }
-      .fade-in {
-        animation: fadeIn 0.3s ease-out forwards;
+
+      /* DARK MODE */
+      :host-context(body.dark) {
+        .glass-pane {
+          background: var(--glass-bg-dark);
+          border-bottom-color: var(--ion-border-color);
+        }
+        .custom-segment {
+          --background: var(--ion-color-step-100);
+        }
+        ion-segment-button {
+          --indicator-color: var(--ion-color-step-300);
+        }
+        .illustration-circle {
+          background: var(--ion-color-step-50);
+        }
       }
     `,
   ],
@@ -411,64 +493,35 @@ export class ReflectPage implements ViewWillEnter {
   private databaseService = inject(DatabaseService);
   private modalCtrl = inject(ModalController);
 
-  @ViewChild(IonInfiniteScroll) infiniteScroll!: IonInfiniteScroll;
+  @ViewChild(CdkVirtualScrollViewport) viewport!: CdkVirtualScrollViewport;
 
-  // --- STATE ---
   filterStatus = signal<FilterType>('PENDING');
   isLoading = signal(true);
+  isLoadingMore = signal(false);
 
-  // Dữ liệu đã load từ DB (Theo tab hiện tại)
   loadedEvents = signal<SelfOpsEvent[]>([]);
-
-  // Tổng số pending (Cho badge header)
   totalPendingBadge = signal(0);
 
-  // Dữ liệu gốc (Toàn bộ từ DB)
-  private allEvents = signal<SelfOpsEvent[]>([]);
-
-  // Pagination State (Client-side slicing)
   private PAGE_SIZE = 20;
   currentPage = signal(1);
 
-  // --- COMPUTED VALUES ---
-  // Lọc data gốc theo tab hiện tại
-  filteredEvents = computed(() => {
-    const status = this.filterStatus();
-    const all = this.allEvents();
-
-    if (status === 'PENDING') {
-      // Lọc các cái chưa review
-      return all
-        .filter((e) => !e.is_reviewed)
-        .sort((a, b) => a.review_due_date - b.review_due_date); // Ưu tiên hết hạn trước
-    } else {
-      // Lọc các cái đã review
-      return all
-        .filter((e) => e.is_reviewed)
-        .sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0)); // Mới review lên đầu
-    }
-  });
-
-  // Cắt danh sách để hiển thị (Pagination)
   displayList = computed(() => {
     const list = this.loadedEvents();
     const limit = this.currentPage() * this.PAGE_SIZE;
     return list.slice(0, limit);
   });
 
-  // Kiểm tra xem đã load hết chưa
   isEndOfData = computed(() => {
     return this.displayList().length >= this.loadedEvents().length;
   });
 
   constructor() {
     addIcons({
-      timeOutline,
       arrowForwardOutline,
       checkmarkDoneOutline,
-      bulbOutline,
       fileTrayFullOutline,
       trophyOutline,
+      calendarClearOutline,
     });
   }
 
@@ -488,11 +541,9 @@ export class ReflectPage implements ViewWillEnter {
 
       this.loadedEvents.set(data);
       this.totalPendingBadge.set(count);
-
       this.currentPage.set(1);
 
-      // Reset Infinite Scroll
-      if (this.infiniteScroll) this.infiniteScroll.disabled = false;
+      if (this.viewport) this.viewport.scrollToIndex(0);
     } catch (e) {
       console.error(e);
     } finally {
@@ -510,19 +561,16 @@ export class ReflectPage implements ViewWillEnter {
     this.loadData();
   }
 
-  onIonInfinite(ev: any) {
-    setTimeout(() => {
-      this.currentPage.update((p) => p + 1);
-      ev.target.complete();
-      if (this.isEndOfData()) ev.target.disabled = true;
-    }, 200);
-
-    // Giả lập delay mạng chút xíu cho mượt (optional) hoặc load ngay
-    setTimeout(() => {
-      this.currentPage.update((p) => p + 1);
-      ev.target.complete();
-      if (this.isEndOfData()) ev.target.disabled = true;
-    }, 200);
+  onScrollIndexChange(index: number) {
+    if (this.isLoadingMore() || this.isEndOfData()) return;
+    const displayedCount = this.displayList().length;
+    if (index >= displayedCount - 5) {
+      this.isLoadingMore.set(true);
+      setTimeout(() => {
+        this.currentPage.update((p) => p + 1);
+        this.isLoadingMore.set(false);
+      }, 100);
+    }
   }
 
   async openReflectModal(event: SelfOpsEvent) {
@@ -534,17 +582,16 @@ export class ReflectPage implements ViewWillEnter {
     await modal.present();
     const { role } = await modal.onWillDismiss();
 
-    // Nếu có thay đổi (save/delete), reload lại data để cập nhật list
     if (role === 'saved' || role === 'deleted') {
       this.loadData();
     }
   }
 
-  getTypeColor(type: string) {
-    return AppUtils.getTypeConfig(type).color;
+  getTypeConfig(type: string) {
+    return AppUtils.getTypeConfig(type);
   }
 
-  getTypeLabel(type: string) {
-    return AppUtils.getTypeLabel(type);
+  trackByFn(index: number, item: SelfOpsEvent) {
+    return item.uuid;
   }
 }

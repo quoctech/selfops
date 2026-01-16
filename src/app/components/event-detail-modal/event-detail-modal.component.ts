@@ -1,4 +1,4 @@
-import { CommonModule, DatePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -34,6 +34,7 @@ import {
   checkmarkOutline,
   closeOutline,
   happyOutline,
+  helpBuoyOutline,
   pricetagsOutline,
   timeOutline,
   trashOutline,
@@ -47,7 +48,6 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule,
     FormsModule,
     DatePipe,
     IonHeader,
@@ -426,6 +426,7 @@ export class EventDetailModalComponent implements OnInit, OnDestroy {
       closeOutline,
       timeOutline,
       happyOutline,
+      helpBuoyOutline,
       pricetagsOutline,
     });
   }

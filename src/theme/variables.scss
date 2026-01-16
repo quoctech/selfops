@@ -1,214 +1,160 @@
-// For information on how to create your own theme, please refer to:
-// https://ionicframework.com/docs/theming/
-
-/* ==================================================
-   1. DEFAULT LIGHT MODE (Giữ nguyên Slate Modern)
-   ================================================== */
-:root {
-    /** MÀU NỀN & TEXT (Light) - Slate 50 & 900 */
-    --ion-background-color: #f8fafc;
-    --ion-background-color-rgb: 248, 250, 252;
-
-    --ion-text-color: #0f172a;
-    --ion-text-color-rgb: 15, 23, 42;
-
-    /** CARD & ITEM (Light) */
-    --ion-item-background: #ffffff;
-    --ion-card-background: #ffffff;
-
-    /** MÀU VIỀN (Light) - Slate 200 */
-    --ion-border-color: #e2e8f0;
-
-    /** PRIMARY COLOR (Blue 600) */
-    --ion-color-primary: #2563eb;
-    --ion-color-primary-rgb: 37, 99, 235;
-    --ion-color-primary-contrast: #ffffff;
-    --ion-color-primary-contrast-rgb: 255, 255, 255;
-    --ion-color-primary-shade: #2056ce;
-    --ion-color-primary-tint: #3b73ef;
-
-    /** SECONDARY (Blue 500) */
-    --ion-color-secondary: #3b82f6;
-    --ion-color-secondary-rgb: 59, 130, 246;
-    --ion-color-secondary-contrast: #ffffff;
-    --ion-color-secondary-contrast-rgb: 255, 255, 255;
-    --ion-color-secondary-shade: #3472d8;
-    --ion-color-secondary-tint: #4f8ef7;
-
-    /** TERTIARY (Indigo) */
-    --ion-color-tertiary: #5260ff;
-    --ion-color-tertiary-rgb: 82, 96, 255;
-    --ion-color-tertiary-contrast: #ffffff;
-    --ion-color-tertiary-contrast-rgb: 255, 255, 255;
-    --ion-color-tertiary-shade: #4854e0;
-    --ion-color-tertiary-tint: #6370ff;
-
-    /** SUCCESS (Green) */
-    --ion-color-success: #2dd36f;
-    --ion-color-success-rgb: 45, 211, 111;
-    --ion-color-success-contrast: #ffffff;
-    --ion-color-success-contrast-rgb: 255, 255, 255;
-    --ion-color-success-shade: #28ba62;
-    --ion-color-success-tint: #42d77d;
-
-    /** WARNING (Yellow) */
-    --ion-color-warning: #ffc409;
-    --ion-color-warning-rgb: 255, 196, 9;
-    --ion-color-warning-contrast: #000000;
-    --ion-color-warning-contrast-rgb: 0, 0, 0;
-    --ion-color-warning-shade: #e0ac08;
-    --ion-color-warning-tint: #ffca22;
-
-    /** DANGER (Red) */
-    --ion-color-danger: #eb445a;
-    --ion-color-danger-rgb: 235, 68, 90;
-    --ion-color-danger-contrast: #ffffff;
-    --ion-color-danger-contrast-rgb: 255, 255, 255;
-    --ion-color-danger-shade: #cf3c4f;
-    --ion-color-danger-tint: #ed576b;
-
-    /** MEDIUM (Slate 500) */
-    --ion-color-medium: #64748b;
-    --ion-color-medium-rgb: 100, 116, 139;
-    --ion-color-medium-contrast: #ffffff;
-    --ion-color-medium-contrast-rgb: 255, 255, 255;
-    --ion-color-medium-shade: #58667a;
-    --ion-color-medium-tint: #748297;
-
-    /** LIGHT (Slate 100) */
-    --ion-color-light: #f1f5f9;
-    --ion-color-light-rgb: 241, 245, 249;
-    --ion-color-light-contrast: #000000;
-    --ion-color-light-contrast-rgb: 0, 0, 0;
-    --ion-color-light-shade: #d4d8db;
-    --ion-color-light-tint: #f2f6fa;
-
-    --glass-bg: rgba(255, 255, 255, 0.75);
-    --glass-blur: blur(20px);
-}
-
-/* ==================================================
-   2. PREMIUM DARK MODE ("Deep Carbon" Theme)
-   ================================================== */
-body.dark {
-    /* --- MÀU CỐT LÕI (High Contrast & Deep) --- */
-    /* Nền đen sâu (Zinc 950) */
-    --ion-background-color: #09090b;
-    --ion-background-color-rgb: 9, 9, 11;
-
-    /* Chữ trắng ngà */
-    --ion-text-color: #f4f4f5;
-    --ion-text-color-rgb: 244, 244, 245;
-
-    /* Viền siêu mỏng, bán trong suốt (Glass effect) */
-    --ion-border-color: rgba(255, 255, 255, 0.12);
-
-    /* --- MÀU KHỐI (Zinc 900) --- */
-    --ion-item-background: #18181b;
-    --ion-card-background: #18181b;
-
-    /* --- TINH CHỈNH MÀU ACCENT --- */
-    --ion-color-primary: #3b82f6;
-    --ion-color-primary-rgb: 59, 130, 246;
-    --ion-color-primary-contrast: #ffffff;
-    --ion-color-primary-contrast-rgb: 255, 255, 255;
-    --ion-color-primary-shade: #3472d8;
-    --ion-color-primary-tint: #4f8ef7;
-
-    --ion-color-secondary: #06b6d4;
-    --ion-color-secondary-rgb: 6, 182, 212;
-    --ion-color-secondary-contrast: #ffffff;
-    --ion-color-secondary-contrast-rgb: 255, 255, 255;
-    --ion-color-secondary-shade: #05a0bb;
-    --ion-color-secondary-tint: #1fd6f5;
-
-    /* Màu trạng thái pastel */
-    --ion-color-success: #4ade80;
-    --ion-color-warning: #facc15;
-    --ion-color-danger: #fb7185;
-    --ion-color-medium: #a1a1aa;
-    --ion-color-light: #27272a;
-
-    /* --- BƯỚC MÀU (STEP COLORS) --- */
-    --ion-color-step-50: #151517;
-    --ion-color-step-100: #212123;
-    --ion-color-step-150: #2d2d2f;
-    --ion-color-step-200: #3a3a3b;
-    --ion-color-step-250: #464647;
-    --ion-color-step-300: #525254;
-    --ion-color-step-350: #5e5e60;
-    --ion-color-step-400: #6a6a6c;
-    --ion-color-step-450: #767678;
-    --ion-color-step-500: #838384;
-    --ion-color-step-550: #8f8f90;
-    --ion-color-step-600: #9b9b9c;
-    --ion-color-step-650: #a7a7a9;
-    --ion-color-step-700: #b3b3b5;
-    --ion-color-step-750: #bfbfb1;
-    --ion-color-step-800: #ccccc8;
-    --ion-color-step-850: #d8d8d4;
-    --ion-color-step-900: #e4e4e0;
-    --ion-color-step-950: #f0f0ec;
-
-    --glass-bg: rgba(9, 9, 11, 0.55);
-    --glass-blur: blur(16px);
-}
-
-/* ==================================================
-   3. GLOBAL COMPONENT STYLES (Refined)
+   /* ==================================================
+   VARIABLES.SCSS - PREMIUM THEME (FIXED)
    ================================================== */
 
-/* --- CARD --- */
-ion-card {
-    border-radius: 16px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    transition: all 0.3s ease;
-    overflow: hidden;
-}
+   :root {
+       /* --- 1. LIGHT MODE: Pure Clean White --- */
+       --ion-background-color: #FFFFFF;
+       --ion-background-color-rgb: 255, 255, 255;
 
-body.dark ion-card {
-    box-shadow: none;
-    border: 1px solid var(--ion-border-color);
-    background: var(--ion-card-background);
-}
+       --ion-text-color: #111827;
+       /* Gray 900 */
+       --ion-text-color-rgb: 17, 24, 39;
 
-/* --- ITEM --- */
-body.dark ion-item {
-    --background: var(--ion-item-background);
-    --border-color: var(--ion-border-color);
-}
+       --ion-card-background: #FFFFFF;
+       --ion-item-background: #FFFFFF;
 
-/* --- MODAL / ALERT / SHEET --- */
-body.dark ion-modal,
-body.dark ion-action-sheet,
-body.dark ion-alert {
-    --background: #18181b;
-}
+       /* Fix Toolbar Light Mode */
+       --ion-toolbar-background: #FFFFFF;
+       --ion-toolbar-text-color: #111827;
 
-/* --- HEADER & TOOLBAR (PREMIUM GLASS EFFECT) --- */
+       /* Viền siêu mỏng */
+       --ion-border-color: #F3F4F6;
+       /* Gray 100 */
 
-/* 1. Xử lý khung Header */
-body.dark ion-header {
-    /* Xóa bóng đổ mặc định của Material Design để nhìn phẳng */
-    box-shadow: none;
+       /* --- GLASS FORMULA (iOS Standard) --- */
+       --glass-bg-light: rgba(255, 255, 255, 0.9);
+       --glass-bg-dark: rgba(0, 0, 0, 0.85);
+       --glass-blur: blur(20px) saturate(180%);
 
-    /* Thêm đường kẻ mỏng bên dưới để tách biệt nội dung (quan trọng cho hiệu ứng kính) */
-    border-bottom: 1px solid var(--ion-border-color);
+       --border-light: rgba(0, 0, 0, 0.04);
+       --border-dark: rgba(255, 255, 255, 0.08);
 
-    /* Đảm bảo background của header container trong suốt để toolbar hiện màu */
-    background: transparent;
-}
+       /* --- BUTTON BASIC (High Contrast) --- */
+       --btn-basic-bg: #000000;
+       --btn-basic-text: #FFFFFF;
+       --btn-basic-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 
-/* 2. Xử lý Toolbar (Thanh công cụ bên trong) */
-body.dark ion-header ion-toolbar {
-    --color: var(--ion-text-color);
-    --border-color: transparent;
-}
+       /* --- BRANDING --- */
+       --brand-gradient: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%);
 
-body.dark ion-header ion-toolbar::part(background) {
-    /* Màu nền bán trong suốt (Deep Carbon với 70% opacity) */
-    background: rgba(9, 9, 11, 0.7);
-    /* Hiệu ứng mờ (Blur) nội dung bên dưới */
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-}
+       /* Brand Colors */
+       --ion-color-primary: #3B82F6;
+       --ion-color-primary-rgb: 59, 130, 246;
+       --ion-color-primary-contrast: #ffffff;
+       --ion-color-primary-contrast-rgb: 255, 255, 255;
+       --ion-color-primary-shade: #3472d9;
+       --ion-color-primary-tint: #4f8ef7;
+
+       /* Secondary */
+       --ion-color-secondary: #6366F1;
+       --ion-color-secondary-rgb: 99, 102, 241;
+       --ion-color-secondary-contrast: #ffffff;
+       --ion-color-secondary-contrast-rgb: 255, 255, 255;
+       --ion-color-secondary-shade: #575ad4;
+       --ion-color-secondary-tint: #7375f2;
+
+       /* Status Colors */
+       --ion-color-success: #10B981;
+       --ion-color-success-rgb: 16, 185, 129;
+
+       --ion-color-warning: #F59E0B;
+       --ion-color-warning-rgb: 245, 158, 11;
+
+       --ion-color-danger: #EF4444;
+       --ion-color-danger-rgb: 239, 68, 68;
+
+       --ion-color-medium: #94A3B8;
+       --ion-color-medium-rgb: 148, 163, 184;
+
+       --ion-color-light: #F8FAFC;
+       --ion-color-light-rgb: 248, 250, 252;
+
+       /* PREMIUM SHADOWS */
+       --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.02), 0 8px 24px rgba(0, 0, 0, 0.02);
+
+       /* STEP COLORS (Light Mode) */
+       --ion-color-step-50: #f2f2f7;
+       --ion-color-step-100: #e5e5e5;
+       --ion-color-step-150: #d9d9d9;
+       --ion-color-step-200: #cccccc;
+   }
+
+   /* ==================================================
+   2. DARK MODE MIXIN (Fix lỗi cú pháp)
+   ================================================== */
+   @mixin dark-theme-vars {
+       /* True Black */
+       --ion-background-color: #000000;
+       --ion-background-color-rgb: 0, 0, 0;
+
+       --ion-text-color: #F9FAFB;
+       /* Gray 50 */
+       --ion-text-color-rgb: 249, 250, 251;
+
+       --ion-card-background: #111113;
+       /* Zinc 900+ */
+       --ion-item-background: #111113;
+
+       /* Fix Toolbar Dark Mode */
+       --ion-toolbar-background: #000000;
+       --ion-toolbar-text-color: #ffffff;
+
+       --ion-border-color: rgba(255, 255, 255, 0.12);
+
+       /* Nút Basic đảo màu */
+       --btn-basic-bg: #FFFFFF;
+       --btn-basic-text: #000000;
+       --btn-basic-shadow: 0 8px 20px rgba(255, 255, 255, 0.1);
+
+       --brand-gradient: linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%);
+       --ion-color-primary: #60A5FA;
+       --ion-color-medium: #9CA3AF;
+       --ion-color-light: #27272A;
+
+       /* Shadow phẳng hơn */
+       --shadow-card: none;
+
+       /* Dark Steps (True Black System) */
+       --ion-color-step-50: #0d0d0d;
+       --ion-color-step-100: #1a1a1a;
+       --ion-color-step-150: #262626;
+       --ion-color-step-200: #333333;
+       --ion-color-step-300: #4d4d4d;
+   }
+
+   /* Kích hoạt 1: Qua class .dark (Manual toggle) */
+   body.dark {
+       @include dark-theme-vars;
+   }
+
+   /* Kích hoạt 2: Qua System Preference (Auto) */
+   @media (prefers-color-scheme: dark) {
+       body {
+           @include dark-theme-vars;
+       }
+   }
+
+   /* ==================================================
+   GLOBAL RESETS & HELPERS
+   ================================================== */
+
+   ion-content {
+       --background: var(--ion-background-color);
+   }
+
+   /* Ép kiểu Premium cho Card */
+   ion-card,
+   .premium-card {
+       box-shadow: var(--shadow-card) !important;
+       border: 1px solid var(--ion-border-color) !important;
+       border-radius: 20px !important;
+   }
+
+   /* GPU Acceleration Helpers */
+   .gpu-layer {
+       transform: translateZ(0);
+       will-change: opacity, transform;
+       -webkit-backface-visibility: hidden;
+       backface-visibility: hidden;
+   }

@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -61,7 +60,6 @@ const EMOTION_CHIPS = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule,
     FormsModule,
     IonHeader,
     IonToolbar,
@@ -642,6 +640,7 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
     await Haptics.impact({ style: ImpactStyle.Medium });
     this.isSaving.set(true);
 
+    const now = AppUtils.getNow();
     try {
       const extractedTags = this.extractTags(rawText);
       extractedTags.forEach((t) => this.tagService.addTagToCache(t));
@@ -655,8 +654,8 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
         tags: extractedTags,
         meta_data: [],
         is_reviewed: false,
-        review_due_date: Date.now() + ONE_WEEK_MS,
-        created_at: Date.now(),
+        review_due_date: now + ONE_WEEK_MS,
+        created_at: now,
       };
 
       await this.databaseService.addEvent(newEvent);
