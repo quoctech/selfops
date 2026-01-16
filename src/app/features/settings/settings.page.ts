@@ -259,8 +259,6 @@ import { NotificationService } from 'src/app/core/services/notification.service'
           >
             v1.3.0 (Build 2026.01)
           </div>
-
-          <p class="copyright">Crafted for your growth journey.</p>
         </div>
       </div>
 
