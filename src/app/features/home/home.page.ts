@@ -51,6 +51,7 @@ import { EventDetailModalComponent } from 'src/app/components/event-detail-modal
 import { StatsModalComponent } from 'src/app/components/stats-modal/stats-modal.component';
 import { SelfOpsEvent, SelfOpsEventType } from 'src/app/core/models/event.type';
 import { DatabaseService } from 'src/app/core/services/database/database.service';
+import { TagService } from 'src/app/core/services/tag.service';
 import { AppUtils } from 'src/app/core/utils/app.utils';
 import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.component';
 
@@ -77,8 +78,8 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
     DailyCheckInComponent,
   ],
   template: `
-    <ion-header class="ion-no-border">
-      <ion-toolbar class="ion-padding">
+    <ion-header class="ion-padding ion-no-border">
+      <ion-toolbar>
         <div class="header-inner ion-padding-horizontal">
           <div class="brand-section">
             <h1 class="brand-title">
@@ -102,8 +103,16 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
       </ion-toolbar>
     </ion-header>
 
-    <ion-content [fullscreen]="true" class="main-content">
-      <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+    <ion-content
+      [fullscreen]="true"
+      class="main-content"
+      [scrollY]="!isModalOpen()"
+    >
+      <ion-refresher
+        slot="fixed"
+        (ionRefresh)="handleRefresh($event)"
+        [disabled]="isModalOpen()"
+      >
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
@@ -148,10 +157,19 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
           mode="ios"
         ></ion-searchbar>
 
-        @if (filterType() !== 'ALL') {
-        <div class="filter-badge fade-in" (click)="handleFilterChange('ALL')">
-          <span>Đang lọc: {{ getEventConfig(filterType()).label }}</span>
-          <ion-icon name="close-circle"></ion-icon>
+        @if (filterType() !== 'ALL' || filterTag() !== '') {
+        <div class="active-filters-row fade-in">
+          @if (filterType() !== 'ALL') {
+          <div class="filter-badge" (click)="handleFilterChange('ALL')">
+            <span>Loại: {{ getEventConfig(filterType()).label }}</span>
+            <ion-icon name="close-circle"></ion-icon>
+          </div>
+          } @if (filterTag() !== '') {
+          <div class="filter-badge tag-badge" (click)="handleTagClick('')">
+            <span>Tag: #{{ filterTag() }}</span>
+            <ion-icon name="close-circle"></ion-icon>
+          </div>
+          }
         </div>
         }
 
@@ -198,28 +216,56 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
 
             <h3 class="item-context">{{ event.context }}</h3>
 
-            @if (event.emotion) {
+            @if ((event.tags && event.tags.length > 0) || event.emotion) {
             <div class="item-footer">
-              <span class="emotion-tag">{{ event.emotion }}</span>
+              @if (event.tags && event.tags.length > 0) {
+              <div class="tags-list">
+                @for (tag of event.tags; track tag) {
+                <span
+                  class="mini-tag ion-activatable ripple-parent"
+                  [class.active-tag]="filterTag() === tag"
+                  (click)="handleTagClick(tag); $event.stopPropagation()"
+                >
+                  #{{ tag }}
+                  <ion-ripple-effect></ion-ripple-effect>
+                </span>
+                }
+              </div>
+              } @if (event.emotion) {
+              <span
+                class="emotion-tag"
+                [class.ms-auto]="event.tags && event.tags.length > 0"
+              >
+                {{ event.emotion }}
+              </span>
+              }
             </div>
             }
           </div>
           <ion-ripple-effect></ion-ripple-effect>
         </div>
         } @empty { @if (!isLoading() && events().length === 0) {
-        <div class="empty-state">
+        <div class="empty-state fade-in">
           <div class="icon-circle">
             <ion-icon
               [name]="
-                searchQuery() ? 'search-outline' : 'document-text-outline'
+                searchQuery() || filterTag()
+                  ? 'search-outline'
+                  : 'document-text-outline'
               "
             ></ion-icon>
           </div>
-          <h3>{{ searchQuery() ? 'Không tìm thấy' : 'Trang giấy trắng' }}</h3>
+          <h3>
+            {{
+              searchQuery() || filterTag()
+                ? 'Không tìm thấy'
+                : 'Trang giấy trắng'
+            }}
+          </h3>
           <p>
             {{
-              searchQuery()
-                ? 'Thử từ khóa khác xem sao.'
+              searchQuery() || filterTag()
+                ? 'Thử thay đổi bộ lọc hoặc tìm kiếm khác.'
                 : 'Hãy bắt đầu ghi lại dòng suy nghĩ đầu tiên.'
             }}
           </p>
@@ -230,7 +276,7 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
       <ion-infinite-scroll
         threshold="100px"
         (ionInfinite)="onIonInfinite($event)"
-        [disabled]="isEndOfData()"
+        [disabled]="isEndOfData() || isModalOpen()"
       >
         <ion-infinite-scroll-content
           loadingSpinner="bubbles"
@@ -248,21 +294,16 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
     `
       /* --- HEADER & BRANDING --- */
       ion-header {
-        background: transparent;
-        border: none !important;
+        background: var(--ion-background-color);
       }
-
       ion-toolbar {
-        --background: transparent;
+        --background: var(--ion-background-color);
         --border-width: 0;
       }
-
-      ion-toolbar::part(background) {
-        background: var(--glass-bg);
-        backdrop-filter: var(--glass-blur);
-        -webkit-backdrop-filter: var(--glass-blur);
+      body.dark ion-header ion-toolbar::part(background) {
+        background: var(--ion-background-color);
+        -webkit-backdrop-filter: blur(20px);
       }
-
       .header-inner {
         display: flex;
         justify-content: space-between;
@@ -270,7 +311,6 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         padding-top: 4px;
         padding-bottom: 4px;
       }
-
       .brand-title {
         font-size: 1.6rem;
         font-weight: 800;
@@ -278,7 +318,6 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         letter-spacing: -0.5px;
         line-height: 1;
       }
-
       .text-gradient {
         background: linear-gradient(
           135deg,
@@ -295,7 +334,6 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         font-size: 1.8rem;
         line-height: 0;
       }
-
       .date-label {
         margin: 4px 0 0 0;
         font-size: 0.75rem;
@@ -319,7 +357,6 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         background: rgba(var(--ion-color-primary-rgb), 0.1);
         border: 1px solid rgba(var(--ion-color-primary-rgb), 0.2);
         animation: pulse-glow 3s infinite ease-in-out;
-        /* PERFORMANCE: Tách layer riêng cho animation */
         will-change: transform, box-shadow;
       }
       @keyframes pulse-glow {
@@ -336,7 +373,6 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
       .section-checkin {
         margin-bottom: 16px;
       }
-
       .stats-grid {
         display: grid;
         grid-template-columns: 1fr 1fr 1fr;
@@ -356,7 +392,6 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         overflow: hidden;
         transition: transform 0.1s;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-        /* PERFORMANCE: Tối ưu render */
         contain: content;
       }
       .mini-card:active {
@@ -366,7 +401,6 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         background: var(--ion-color-light);
         border-color: var(--ion-color-primary);
       }
-
       .icon-box {
         width: 32px;
         height: 32px;
@@ -377,12 +411,10 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         margin-bottom: 6px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       }
-
       .stat-info {
         display: flex;
         align-items: center;
       }
-
       .stat-count {
         font-size: 1.15rem;
         font-weight: 700;
@@ -395,24 +427,25 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         color: var(--ion-color-medium);
       }
 
-      /* --- STICKY TOOLS (Tối ưu) --- */
+      /* --- STICKY TOOLS --- */
       .sticky-tools {
         position: sticky;
         top: 0;
         z-index: 50;
-        background: var(--glass-bg);
-        backdrop-filter: var(--glass-blur);
-        -webkit-backdrop-filter: var(--glass-blur);
-
-        padding-top: 10px;
-        padding-bottom: 10px;
+        background: var(--ion-background-color);
+        padding-top: 4px;
+        padding-bottom: 12px;
         border-top: none;
         border-bottom: none;
         transition: all 0.3s;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-        /* PERFORMANCE: Báo trước trình duyệt */
         will-change: position, transform;
-        transform: translateZ(0); /* Kích hoạt GPU */
+        transform: translateZ(0);
+      }
+      :host-context(body.dark) .sticky-tools {
+        background: rgba(18, 18, 18, 0.95);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
       }
 
       .custom-searchbar {
@@ -427,6 +460,12 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         --background: var(--ion-color-step-100);
       }
 
+      .active-filters-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
       .filter-badge {
         display: inline-flex;
         align-items: center;
@@ -437,9 +476,13 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         border-radius: 20px;
         font-size: 0.8rem;
         font-weight: 600;
-        margin-top: 10px;
         cursor: pointer;
         box-shadow: 0 4px 10px rgba(var(--ion-color-primary-rgb), 0.3);
+      }
+      .tag-badge {
+        background: var(--ion-color-tertiary);
+        color: var(--ion-color-tertiary-contrast);
+        box-shadow: 0 4px 10px rgba(var(--ion-color-tertiary-rgb), 0.3);
       }
 
       .timeline-divider {
@@ -470,7 +513,6 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         padding: 8px 16px 80px 16px;
         background: transparent;
       }
-
       .timeline-item {
         background: var(--ion-card-background);
         border-radius: 16px;
@@ -481,7 +523,6 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
         min-height: 85px;
         border: 1px solid var(--ion-color-light-shade);
-        /* PERFORMANCE: Quan trọng cho list dài */
         contain: content;
       }
       :host-context(body.dark) .timeline-item {
@@ -490,7 +531,6 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
       .timeline-item:active {
         transform: scale(0.98);
       }
-
       .color-strip {
         width: 6px;
         flex-shrink: 0;
@@ -502,7 +542,6 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         flex-direction: column;
         justify-content: center;
       }
-
       .item-header {
         display: flex;
         justify-content: space-between;
@@ -527,16 +566,53 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         -webkit-box-orient: vertical;
         overflow: hidden;
       }
+      .item-footer {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 4px;
+      }
+      .tags-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .mini-tag {
+        font-size: 0.7rem;
+        color: var(--ion-text-color);
+        background-color: var(--ion-color-step-50, #f2f2f2);
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        opacity: 0.85;
+        border: 1px solid transparent;
+        position: relative;
+        overflow: hidden;
+      }
+      :host-context(body.dark) .mini-tag {
+        background-color: rgba(255, 255, 255, 0.08);
+        color: #e0e0e0;
+      }
+      .mini-tag.active-tag {
+        background-color: var(--ion-color-tertiary);
+        color: white;
+        opacity: 1;
+      }
       .emotion-tag {
         font-size: 0.75rem;
         color: var(--ion-text-color);
         background: var(--ion-color-light);
-        padding: 4px 10px;
+        padding: 3px 10px;
         border-radius: 6px;
         font-weight: 500;
       }
+      .ms-auto {
+        margin-left: auto;
+      }
 
-      /* FAB & EMPTY STATE */
+      /* FAB & EMPTY */
       ion-fab[vertical='bottom'] {
         bottom: 20px;
       }
@@ -545,7 +621,6 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         --color: var(--ion-background-color);
         --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
       }
-
       .empty-state {
         text-align: center;
         padding-top: 60px;
@@ -563,7 +638,9 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
         font-size: 32px;
         color: var(--ion-color-medium);
       }
-
+      .fade-in {
+        animation: fadeIn 0.3s ease-out;
+      }
       @keyframes fadeIn {
         from {
           opacity: 0;
@@ -574,15 +651,14 @@ import { DailyCheckInComponent } from './components/daily-checkin/daily-checkin.
           transform: translateY(0);
         }
       }
-      .fade-in {
-        animation: fadeIn 0.3s ease-out;
-      }
     `,
   ],
 })
 export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
   private databaseService = inject(DatabaseService);
   private modalCtrl = inject(ModalController);
+  private tagService = inject(TagService);
+
   private destroy$ = new Subject<void>();
   private lastLoadTime = 0;
   private searchSubject = new Subject<string>();
@@ -591,51 +667,30 @@ export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
   readonly PAGE_SIZE = 30;
 
   events = signal<SelfOpsEvent[]>([]);
-  // State quản lý Stats (Toàn bộ DB)
   stats = signal<Record<string, number>>({});
   isLoading = signal(false);
   isEndOfData = signal(false);
   searchTotalCount = signal<number>(0);
 
-  // Filter & Search
   searchQuery = signal('');
   filterType = signal<SelfOpsEventType | 'ALL'>('ALL');
+  filterTag = signal<string>('');
 
-  today = Date.now();
+  isModalOpen = signal(false);
+
+  today = AppUtils.getNow();
   eventTypes = Object.values(SelfOpsEventType);
 
-  displayEvents = computed(() => {
-    /*const list = this.events(); // List này đã được lọc theo Type từ DB rồi
-    const query = this.searchQuery().toLowerCase().trim();
-
-    return list.filter((ev) => {
-      const matchText =
-        query === '' ||
-        ev.context.toLowerCase().includes(query) ||
-        (ev.emotion && ev.emotion.toLowerCase().includes(query));
-      return matchText;
-    });*/
-
-    // Vì this.events() giờ đã là kết quả chính xác từ DB rồi
-    return this.events();
-  });
+  displayEvents = computed(() => this.events());
 
   totalEventsCount = computed(() => {
-    const query = this.searchQuery().trim();
-
-    // TRƯỜNG HỢP 1: ĐANG TÌM KIẾM
-    if (query !== '') {
+    if (this.searchQuery().trim() !== '' || this.filterTag() !== '') {
       return this.searchTotalCount();
     }
-
-    // TH2: BÌNH THƯỜNG (Dùng stats cached cho nhanh)
     const type = this.filterType();
     const stats = this.stats();
-    if (type === 'ALL') {
-      return Object.values(stats).reduce((a, b) => a + b, 0);
-    } else {
-      return stats[type] || 0;
-    }
+    if (type === 'ALL') return Object.values(stats).reduce((a, b) => a + b, 0);
+    return stats[type] || 0;
   });
 
   constructor() {
@@ -669,10 +724,7 @@ export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
       });
 
     this.searchSubject
-      .pipe(
-        debounceTime(400), // Chờ 400ms sau khi ngừng gõ
-        distinctUntilChanged() // Chỉ chạy nếu nội dung khác lần trước
-      )
+      .pipe(debounceTime(400), distinctUntilChanged())
       .subscribe((text) => {
         this.searchQuery.set(text);
         this.loadEvents(true);
@@ -685,32 +737,22 @@ export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
   }
 
   async ionViewWillEnter() {
-    // Chỉ reload nếu events đang rỗng (lần đầu vào lại tab)
-    // Nếu đã có data thì giữ nguyên scroll position, không reload lại gây giật
-    const now = Date.now();
-    if (now - this.lastLoadTime < 500) {
-      return;
-    }
+    const now = AppUtils.getNow();
+    if (now - this.lastLoadTime < 500) return;
     this.lastLoadTime = now;
-
+    this.tagService.loadTags();
     if (this.events().length === 0) {
       await this.refreshDashboard();
     } else {
-      // Vẫn nên update lại Stats vì có thể thay đổi từ tab khác
       this.loadStats();
     }
   }
 
-  // --- LOGIC LOAD DỮ LIỆU ---
-
-  // Hàm Refresh tổng (Gọi khi Pull-to-refresh hoặc Init)
   async refreshDashboard() {
     this.currentPage = 0;
     this.isEndOfData.set(false);
     this.events.set([]);
     this.stats.set({});
-
-    // Chạy song song 2 luồng: Load List (Page 0) & Load Stats (All)
     await Promise.all([this.loadEvents(true), this.loadStats()]);
   }
 
@@ -724,45 +766,42 @@ export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
     infiniteScrollEvent?: InfiniteScrollCustomEvent
   ) {
     if (this.isLoading() && !reset) return;
-
     this.isLoading.set(true);
 
     try {
       const pageToLoad = reset ? 0 : this.currentPage;
-
       const currentFilter = this.filterType();
       const currentSearch = this.searchQuery();
+      const currentTag = this.filterTag();
 
       const promises: Promise<any>[] = [
         this.databaseService.getEventsPaging(
           pageToLoad,
           this.PAGE_SIZE,
           currentFilter,
-          currentSearch
+          currentSearch,
+          currentTag
         ),
       ];
 
-      // Nếu là lần load đầu tiên của search/filter, ta đếm tổng luôn
       if (reset) {
         promises.push(
-          this.databaseService.countEventsByFilter(currentFilter, currentSearch)
+          this.databaseService.countEventsByFilter(
+            currentFilter,
+            currentSearch,
+            currentTag
+          )
         );
       }
 
       const [newEvents, totalCount] = await Promise.all(promises);
-      // Nếu có count mới thì update signal
-      if (reset && typeof totalCount === 'number') {
+      if (reset && typeof totalCount === 'number')
         this.searchTotalCount.set(totalCount);
-      }
-
-      // Check xem đã hết dữ liệu chưa
-      if (newEvents.length < this.PAGE_SIZE) {
-        this.isEndOfData.set(true);
-      }
+      if (newEvents.length < this.PAGE_SIZE) this.isEndOfData.set(true);
 
       if (reset) {
         this.events.set(newEvents);
-        this.currentPage = 1; // Reset về page 1 (vì page 0 đã load)
+        this.currentPage = 1;
       } else {
         this.events.update((old) => [...old, ...newEvents]);
         this.currentPage++;
@@ -775,7 +814,6 @@ export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
     }
   }
 
-  // Load Thống kê (Toàn bộ DB)
   async loadStats() {
     try {
       const data = await this.databaseService.getDashboardStats();
@@ -789,38 +827,44 @@ export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
     await this.loadEvents(false, ev);
   }
 
-  getCountByType(type: SelfOpsEventType) {
-    return this.events().filter((e) => e.type === type).length;
-  }
-
   async handleFilterChange(type: SelfOpsEventType | 'ALL') {
     const newType = this.filterType() === type ? 'ALL' : type;
     this.filterType.set(newType);
+    await this.refreshDashboard();
+  }
 
+  async handleTagClick(tag: string) {
+    if (tag === '' || this.filterTag() === tag) {
+      this.filterTag.set('');
+    } else {
+      this.filterTag.set(tag);
+    }
     await this.refreshDashboard();
   }
 
   handleSearch(ev: any) {
     this.searchSubject.next(ev.detail.value);
   }
-
   getEventConfig(type: string | SelfOpsEventType) {
     return AppUtils.getTypeConfig(type);
   }
 
-  // --- MODALS ---
   async openAddModal() {
+    this.isModalOpen.set(true); // Lock
+
     const modal = await this.modalCtrl.create({
       component: AddEventModalComponent,
-      breakpoints: [0, 0.75, 1],
-      initialBreakpoint: 0.75,
+      initialBreakpoint: 1, // Fullscreen
     });
     await modal.present();
     const { role } = await modal.onWillDismiss();
+    this.isModalOpen.set(false); // Unlock
     if (role === 'confirm') this.loadEvents(true);
   }
 
   async openDetail(event: any) {
+    this.isModalOpen.set(true); // Lock
+
     const modal = await this.modalCtrl.create({
       component: EventDetailModalComponent,
       componentProps: { event },
@@ -828,28 +872,30 @@ export class HomePage implements OnInit, OnDestroy, ViewWillEnter {
     await modal.present();
 
     const { role } = await modal.onWillDismiss();
-    // --- XỬ LÝ SAU KHI ĐÓNG MODAL ---
+
+    this.isModalOpen.set(false); // Unlock
+
     if (role === 'deleted') {
-      // 1. Xóa ngay lập tức khỏi UI (Client-side update)
       this.events.update((currentList) =>
         currentList.filter((e) => e.uuid !== event.uuid)
       );
-
-      // 2. Load lại Stats ngầm
       this.loadStats();
     } else if (role === 'saved') {
-      // Nếu update nội dung thì cần load lại để cập nhật text/reflection mới
-      // Cách tối ưu: Tìm item trong mảng và update field, nhưng reload cho an toàn data
       this.refreshDashboard();
     }
   }
 
   async openStats() {
+    this.isModalOpen.set(true); // Lock
+
     const allEvents = await this.databaseService.getAllEvents();
     const modal = await this.modalCtrl.create({
       component: StatsModalComponent,
       componentProps: { events: allEvents },
     });
     await modal.present();
+
+    await modal.onWillDismiss();
+    this.isModalOpen.set(false); // Unlock
   }
 }

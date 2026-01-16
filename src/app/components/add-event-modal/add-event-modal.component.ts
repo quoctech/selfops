@@ -16,13 +16,11 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { Keyboard } from '@capacitor/keyboard';
 import {
   IonButton,
-  IonButtons,
   IonContent,
+  IonFooter,
   IonHeader,
   IonIcon,
-  IonLabel,
-  IonSegment,
-  IonSegmentButton,
+  IonRippleEffect,
   IonSpinner,
   IonTextarea,
   IonTitle,
@@ -32,10 +30,11 @@ import {
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
-  checkmarkCircle,
-  checkmarkOutline,
+  arrowUpOutline,
   closeOutline,
-  heartOutline,
+  happyOutline,
+  pricetagsOutline,
+  saveOutline,
 } from 'ionicons/icons';
 import {
   ONE_WEEK_MS,
@@ -43,9 +42,9 @@ import {
   SelfOpsEventType,
 } from 'src/app/core/models/event.type';
 import { DatabaseService } from 'src/app/core/services/database/database.service';
+import { TagService } from 'src/app/core/services/tag.service';
 import { AppUtils } from 'src/app/core/utils/app.utils';
 
-// Static Data: Khai báo ngoài class để không tốn bộ nhớ khởi tạo lại
 const EMOTION_CHIPS = [
   'Lo lắng',
   'Tức giận',
@@ -67,287 +66,465 @@ const EMOTION_CHIPS = [
     IonHeader,
     IonToolbar,
     IonTitle,
-    IonButtons,
     IonButton,
     IonContent,
-    IonSegment,
-    IonSegmentButton,
-    IonLabel,
+    IonFooter,
     IonTextarea,
     IonIcon,
+    IonRippleEffect,
     IonSpinner,
   ],
   template: `
-    <ion-header class="ion-padding ion-no-border">
+    <ion-header class="ion-no-border">
       <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-button color="medium" (click)="cancel()">
-            <ion-icon name="close-outline" slot="icon-only"></ion-icon>
-          </ion-button>
-        </ion-buttons>
-
-        <ion-title>Ghi nhận sự kiện</ion-title>
-
-        <ion-buttons slot="end">
-          <ion-button
-            color="primary"
-            (click)="save()"
-            [strong]="true"
-            [disabled]="isSaving() || !context()"
-          >
-            @if (isSaving()) {
-            <ion-spinner name="crescent" class="custom-spinner"></ion-spinner>
-            } @else {
-            <ion-icon
-              slot="icon-only"
-              name="checkmark-outline"
-              size="large"
-            ></ion-icon>
-            }
-          </ion-button>
-        </ion-buttons>
+        <ion-title class="modal-title">Ghi Nhận</ion-title>
       </ion-toolbar>
     </ion-header>
 
-    <ion-content class="ion-padding" #content>
-      <div class="segment-container">
-        <ion-segment
-          [value]="selectedType()"
-          (ionChange)="onTypeChange($event)"
-          [color]="dynamicColor()"
-          mode="ios"
-          class="custom-segment"
+    <ion-content
+      class="ion-padding-horizontal no-scroll-bounce"
+      [scrollY]="true"
+      #content
+    >
+      <div class="custom-tabs-wrapper top-spacing">
+        @for (item of uiEventTypes; track item.value) {
+        <div
+          class="tab-item ion-activatable"
+          [class.selected]="selectedType() === item.value"
+          (click)="onTypeChange(item.value)"
         >
-          @for (item of uiEventTypes; track item.value) {
-          <ion-segment-button [value]="item.value">
-            <ion-label class="segment-text">{{ item.label }}</ion-label>
-          </ion-segment-button>
-          }
-        </ion-segment>
+          <span class="tab-label">{{ item.label }}</span>
+          <div
+            class="active-indicator"
+            [style.background-color]="
+              selectedType() === item.value
+                ? getTypeColor(item.value)
+                : 'transparent'
+            "
+          ></div>
+          <ion-ripple-effect></ion-ripple-effect>
+        </div>
+        }
       </div>
 
-      <div class="input-container" #inputContainer>
-        <ion-textarea
-          class="custom-textarea"
-          [ngModel]="context()"
-          (ngModelChange)="context.set($event)"
-          rows="5"
-          label="Nội dung sự kiện"
-          labelPlacement="floating"
-          placeholder="Ví dụ: Đã chốt được phương án deploy mới..."
-          [autoGrow]="true"
-          inputmode="text"
-        ></ion-textarea>
+      <div class="section-wrapper input-wrapper-relative">
+        <div class="input-container" #inputContainer>
+          <ion-textarea
+            #mainInput
+            class="hero-input"
+            [ngModel]="context()"
+            (ngModelChange)="onContextChange($event)"
+            rows="5"
+            placeholder="Viết gì đó... #tag"
+            [autoGrow]="true"
+            inputmode="text"
+            autofocus="true"
+          ></ion-textarea>
+        </div>
+
+        @if (showSuggestions() && filteredTags().length > 0) {
+        <div class="suggestion-dropdown fade-in">
+          <div class="suggestion-header">
+            <ion-icon name="pricetags-outline"></ion-icon>
+            <span>Gợi ý thẻ</span>
+          </div>
+          <div class="suggestion-body">
+            @for (tag of filteredTags(); track tag) {
+            <div
+              class="suggestion-item ion-activatable"
+              (click)="selectTag(tag)"
+            >
+              <span class="hash">#</span>{{ tag }}
+              <ion-ripple-effect></ion-ripple-effect>
+            </div>
+            }
+          </div>
+        </div>
+        }
       </div>
 
-      <div class="emotion-section">
-        <p class="section-title">
-          <ion-icon name="heart-outline"></ion-icon>
-          Bạn cảm thấy thế nào?
-        </p>
-
-        <div class="chips-wrapper">
+      <div class="section-wrapper emotion-section">
+        <div class="section-label">
+          <ion-icon name="happy-outline"></ion-icon>
+          <span>Cảm xúc</span>
+        </div>
+        <div class="chips-grid">
           @for (emo of emotionChips; track emo) {
           <div
-            class="custom-chip"
+            class="chip-item ion-activatable"
             [class.active]="selectedEmotions().has(emo)"
             (click)="toggleEmotion(emo)"
           >
-            @if(selectedEmotions().has(emo)) {
-            <ion-icon name="checkmark-circle" class="check-icon"></ion-icon>
-            }
-            <span>{{ emo }}</span>
+            {{ emo }}
+            <ion-ripple-effect></ion-ripple-effect>
           </div>
           }
         </div>
       </div>
 
-      <div class="keyboard-spacer"></div>
+      <div class="footer-spacer"></div>
     </ion-content>
+
+    <ion-footer class="ion-no-border modal-footer">
+      <ion-toolbar class="footer-toolbar">
+        <div class="footer-actions">
+          <ion-button
+            fill="clear"
+            class="btn-icon-only btn-cancel"
+            (click)="cancel()"
+          >
+            <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+          </ion-button>
+
+          <ion-button
+            shape="round"
+            [color]="dynamicColor()"
+            class="btn-save"
+            [disabled]="isSaving() || !context()"
+            (click)="save()"
+          >
+            @if (isSaving()) {
+            <ion-spinner name="crescent" color="light"></ion-spinner>
+            } @else {
+            <ion-icon
+              slot="icon-only"
+              name="arrow-up-outline"
+              size="large"
+            ></ion-icon>
+            }
+          </ion-button>
+        </div>
+      </ion-toolbar>
+    </ion-footer>
   `,
   styles: [
     `
-      /* Utilities */
-      .custom-spinner {
-        width: 24px;
-        height: 24px;
+      /* --- GLOBAL LAYOUT --- */
+      ion-content {
+        --background: var(--ion-background-color);
       }
-      ion-toolbar {
-        --border-style: none;
-      }
-
-      /* Segment */
-      .segment-container {
-        position: sticky;
-        top: 0;
-        z-index: 100;
-        padding-bottom: 16px;
-        background: var(--ion-background-color);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        will-change: transform;
-        transition: background-color 0.3s ease;
+      /* Chặn scroll nảy trên iOS */
+      .no-scroll-bounce::part(scroll) {
+        overscroll-behavior-y: none;
       }
 
-      ion-segment-button {
-        --padding-start: 4px;
-        --padding-end: 4px;
-        min-width: auto;
+      .section-wrapper {
+        margin-bottom: 20px;
+        position: relative;
       }
-      .segment-text {
-        white-space: normal;
+      .top-spacing {
+        margin-top: 8px;
+      }
+      .modal-title {
+        font-weight: 800;
+        font-size: 1.1rem;
+        text-align: center;
+        opacity: 0.9;
+        letter-spacing: -0.02em;
+      }
+
+      /* --- 1. MINIMAL TABS --- */
+      .custom-tabs-wrapper {
+        display: flex;
+        justify-content: space-between;
+        padding: 0 4px 12px 4px;
+        border-bottom: 1px solid var(--ion-color-light-shade);
+      }
+      .tab-item {
+        position: relative;
+        padding: 10px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        text-align: center;
+      }
+      .tab-label {
         font-size: 0.85rem;
-        line-height: 1.1;
-        padding: 4px 0;
-        font-weight: 600;
-        letter-spacing: 0.3px;
+        font-weight: 500;
+        color: var(--ion-color-medium);
+        transition: color 0.2s, font-weight 0.2s;
+      }
+      .active-indicator {
+        width: 24px;
+        height: 3px;
+        border-radius: 2px;
+        margin-top: 4px;
+        opacity: 0;
+        transform: scaleX(0);
+        transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
       }
 
-      /* Input Box */
+      .tab-item.selected .tab-label {
+        color: var(--ion-text-color);
+        font-weight: 700;
+      }
+      .tab-item.selected .active-indicator {
+        opacity: 1;
+        transform: scaleX(1);
+      }
+
+      /* --- 2. HERO INPUT --- */
       .input-container {
-        background: var(--ion-card-background);
-        border-radius: 16px;
-        padding: 16px;
-        margin-bottom: 24px;
-        border: 1px solid var(--ion-color-step-150, #e0e0e0);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
-        transition: border-color 0.2s ease;
-        contain: content;
+        background: transparent;
       }
-      .input-container:focus-within {
-        border-color: var(--ion-color-primary);
-      }
-
-      .custom-textarea {
+      .hero-input {
         --padding-start: 0;
         --padding-end: 0;
-        --padding-top: 0;
-        --placeholder-color: var(--ion-color-medium);
-        font-size: 1.1rem;
-        line-height: 1.6;
+        --padding-top: 12px;
+        --padding-bottom: 0;
+        --placeholder-color: var(--ion-color-step-300, #999);
+        font-size: 1.4rem;
+        line-height: 1.5;
+        font-weight: 500;
+        min-height: 120px;
       }
 
-      /* Emotion Section */
+      /* Dropdown Suggestion */
+      .suggestion-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--ion-card-background);
+        border: 1px solid var(--ion-color-light-shade);
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+        z-index: 100;
+        overflow: hidden;
+        margin-top: -10px;
+      }
+      .suggestion-header {
+        background: var(--ion-color-step-50);
+        padding: 8px 16px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--ion-color-medium);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border-bottom: 1px solid var(--ion-color-light-shade);
+      }
+      .suggestion-body {
+        max-height: 150px;
+        overflow-y: auto;
+      }
+      .suggestion-item {
+        padding: 12px 16px;
+        font-size: 1rem;
+        font-weight: 500;
+        color: var(--ion-text-color);
+        border-bottom: 1px solid var(--ion-color-light-shade);
+        position: relative;
+        overflow: hidden;
+      }
+      .suggestion-item .hash {
+        color: var(--ion-color-primary);
+        font-weight: 800;
+        margin-right: 4px;
+      }
+      .fade-in {
+        animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* --- 3. EMOTION CHIPS (Stable Layout) --- */
       .emotion-section {
         margin-top: 10px;
       }
-      .section-title {
+      .section-label {
         display: flex;
         align-items: center;
-        gap: 8px;
-        font-weight: 700;
-        color: var(--ion-text-color);
-        margin-bottom: 16px;
-        font-size: 1rem;
+        gap: 6px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--ion-color-medium);
+        margin-bottom: 12px;
       }
-
-      .chips-wrapper {
+      .chips-grid {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
-        /* Fix layout shift */
-        min-height: 40px;
+        gap: 8px;
       }
 
-      /* Chip Styles - Tối ưu selector */
-      .custom-chip {
+      .chip-item {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 8px 16px;
-        border-radius: 24px;
-        background-color: var(--ion-color-light);
+        height: 36px;
+        padding: 0 16px;
+        border-radius: 18px; /* Viên thuốc */
+        background-color: var(--ion-color-step-50, #f4f5f8);
         color: var(--ion-text-color);
         font-size: 0.9rem;
         font-weight: 500;
-        cursor: pointer;
-        user-select: none;
-        transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1),
-          background-color 0.2s;
+        /* Border transparent giữ kích thước cố định */
         border: 1px solid transparent;
-        /* Performance: Báo trước cho trình duyệt */
-        will-change: transform, background-color;
+        transition: background-color 0.2s, color 0.2s, transform 0.1s;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        user-select: none;
       }
-
-      .custom-chip:active {
+      .chip-item:active {
         transform: scale(0.95);
-      } /* Feedback vật lý */
+      }
 
-      .custom-chip.active {
+      /* Active State: Chỉ đổi màu, không đổi size */
+      .chip-item.active {
         background-color: var(--ion-color-primary);
-        color: white;
-        box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.3);
-        padding-left: 12px;
+        color: #fff;
         font-weight: 600;
+        box-shadow: 0 4px 10px rgba(var(--ion-color-primary-rgb), 0.3);
       }
 
-      .check-icon {
-        margin-right: 6px;
-        font-size: 1.1rem;
-        animation: scaleIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      /* --- 4. FOOTER ACTIONS --- */
+      .modal-footer {
+        --background: transparent;
+        padding-bottom: 10px;
       }
-      @keyframes scaleIn {
-        from {
-          transform: scale(0);
-          width: 0;
-        }
-        to {
-          transform: scale(1);
-          width: 1.1rem;
-        }
+      .footer-toolbar {
+        --background: transparent;
+        --border-width: 0;
       }
-
-      .keyboard-spacer {
-        height: 350px;
-        pointer-events: none;
+      .footer-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 16px;
+        width: 100%;
       }
 
-      /* --- DARK MODE OVERRIDES --- */
+      .btn-icon-only {
+        width: 52px;
+        height: 52px;
+        margin: 0;
+        --padding-start: 0;
+        --padding-end: 0;
+        --border-radius: 50%;
+        font-size: 1.5rem;
+      }
+
+      .btn-cancel {
+        --color: var(--ion-color-medium);
+        --background: var(--ion-color-step-100);
+      }
+
+      .btn-save {
+        width: 64px;
+        height: 64px; /* Nút Save to hơn để dễ bấm */
+        --box-shadow: 0 6px 20px rgba(var(--ion-color-primary-rgb), 0.35);
+        font-size: 1.8rem;
+      }
+
+      .footer-spacer {
+        height: 90px;
+      }
+
+      /* DARK MODE */
       :host-context(body.dark) {
-        .segment-container {
-          background: var(--ion-color-step-100);
+        .custom-tabs-wrapper {
+          border-bottom-color: var(--ion-color-step-150);
         }
-        .input-container {
-          border-color: var(--ion-color-step-200);
+        .hero-input {
+          --placeholder-color: var(--ion-color-step-400);
         }
-        .custom-chip {
+        .chip-item {
           background-color: var(--ion-color-step-150);
         }
-        .custom-chip:hover {
-          background-color: var(--ion-color-step-250);
+        .btn-cancel {
+          --background: var(--ion-color-step-150);
+        }
+        .suggestion-dropdown {
+          border-color: var(--ion-color-step-200);
         }
       }
     `,
   ],
 })
 export class AddEventModalComponent implements OnInit, OnDestroy {
-  // Signals quản lý State (Reactive & Performant)
+  // Services & Injects
+  private modalCtrl = inject(ModalController);
+  private databaseService = inject(DatabaseService);
+  private tagService = inject(TagService);
+  private platform = inject(Platform);
+
+  // Signals (State)
   isSaving = signal(false);
   selectedType = signal<SelfOpsEventType>(SelfOpsEventType.DECISION);
   context = signal('');
-
-  // Tối ưu: Dùng Set để lookup O(1)
   selectedEmotions = signal<Set<string>>(new Set());
 
+  // UX State
+  showSuggestions = signal(false);
+  filteredTags = signal<string[]>([]);
+
+  // Internal
+  private cursorPos = 0;
+  private listeners: PluginListenerHandle[] = [];
+
   readonly emotionChips = EMOTION_CHIPS;
-  // Pre-calculate Labels cho HTML đỡ phải gọi function
   readonly uiEventTypes = Object.values(SelfOpsEventType).map((type) => ({
     value: type,
     label: AppUtils.getTypeConfig(type).label,
   }));
 
+  @ViewChild('mainInput') mainInput!: IonTextarea;
   @ViewChild('content') content!: IonContent;
   @ViewChild('inputContainer', { read: ElementRef })
   inputContainer!: ElementRef;
 
-  private modalCtrl = inject(ModalController);
-  private databaseService = inject(DatabaseService);
-  private platform = inject(Platform);
-  private keyboardListener: PluginListenerHandle | undefined;
-
   constructor() {
-    addIcons({ heartOutline, closeOutline, checkmarkCircle, checkmarkOutline });
+    addIcons({
+      closeOutline,
+      happyOutline,
+      pricetagsOutline,
+      saveOutline,
+      arrowUpOutline,
+    });
   }
+
+  ngOnInit() {
+    this.tagService.loadTags();
+    if (this.platform.is('capacitor')) {
+      this.initKeyboardListener();
+    }
+  }
+
+  ngOnDestroy() {
+    this.listeners.forEach((h) => h.remove());
+  }
+
+  ionViewDidEnter() {
+    // Focus sau 150ms để animation modal mượt hơn
+    setTimeout(() => this.mainInput.setFocus(), 150);
+  }
+
+  async initKeyboardListener() {
+    const show = await Keyboard.addListener('keyboardDidShow', () => {
+      // Đẩy nội dung lên nhẹ để tránh bị che
+      setTimeout(() => {
+        const inputTop = this.inputContainer.nativeElement.offsetTop;
+        const y = Math.max(0, inputTop - 60);
+        this.content.scrollToPoint(0, y, 300);
+      }, 50);
+    });
+    this.listeners.push(show);
+  }
+
+  // --- LOGIC ---
 
   dynamicColor = computed(() => {
     switch (this.selectedType()) {
@@ -362,53 +539,96 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
     }
   });
 
-  ngOnInit() {
-    if (this.platform.is('capacitor')) {
-      this.initKeyboardLogic();
+  getTypeColor(type: SelfOpsEventType) {
+    switch (type) {
+      case SelfOpsEventType.DECISION:
+        return 'var(--ion-color-primary)';
+      case SelfOpsEventType.MISTAKE:
+        return 'var(--ion-color-danger)';
+      case SelfOpsEventType.STRESS:
+        return 'var(--ion-color-warning)';
+      default:
+        return 'var(--ion-color-medium)';
     }
   }
 
-  ngOnDestroy() {
-    if (this.keyboardListener) this.keyboardListener.remove();
-  }
-
-  async initKeyboardLogic() {
-    this.keyboardListener = await Keyboard.addListener(
-      'keyboardDidShow',
-      () => {
-        const el = this.inputContainer.nativeElement;
-        const y = el.offsetTop - 16;
-        this.content.scrollToPoint(0, y, 300);
-      }
-    );
-
-    if (this.platform.is('ios')) {
-      try {
-        await Keyboard.setAccessoryBarVisible({ isVisible: true });
-      } catch (e) {
-        console.warn('Keyboard accessory bar error', e);
-      }
-    }
-  }
-
-  async onTypeChange(ev: any) {
-    this.selectedType.set(ev.detail.value);
+  async onTypeChange(type: SelfOpsEventType) {
+    this.selectedType.set(type);
     await Haptics.selectionStart();
-    await Haptics.selectionChanged();
-    await Haptics.selectionEnd();
   }
 
   toggleEmotion(emo: string) {
     Haptics.impact({ style: ImpactStyle.Light });
-
-    // Update Set immutable way
     const currentSet = new Set(this.selectedEmotions());
-    if (currentSet.has(emo)) {
-      currentSet.delete(emo);
-    } else {
-      currentSet.add(emo);
-    }
+    if (currentSet.has(emo)) currentSet.delete(emo);
+    else currentSet.add(emo);
     this.selectedEmotions.set(currentSet);
+  }
+
+  // Detect Hashtag
+  async onContextChange(newVal: string) {
+    this.context.set(newVal);
+    const textarea = await this.mainInput.getInputElement();
+    const cursor = textarea.selectionStart || 0;
+    this.cursorPos = cursor;
+
+    const textUpToCursor = newVal.slice(0, cursor);
+    const lastHashIndex = textUpToCursor.lastIndexOf('#');
+
+    if (lastHashIndex !== -1) {
+      const textAfterHash = textUpToCursor.slice(lastHashIndex + 1);
+      // Regex: Chỉ chữ cái, số, gạch dưới, không khoảng trắng
+      if (!/\s/.test(textAfterHash)) {
+        this.filterTags(textAfterHash);
+        return;
+      }
+    }
+    this.showSuggestions.set(false);
+  }
+
+  filterTags(term: string) {
+    const all = this.tagService.uniqueTags();
+    if (!all || all.length === 0) {
+      this.showSuggestions.set(false);
+      return;
+    }
+    const matches = all.filter((t) =>
+      t.toLowerCase().includes(term.toLowerCase())
+    );
+    if (matches.length > 0) {
+      this.filteredTags.set(matches);
+      this.showSuggestions.set(true);
+    } else {
+      this.showSuggestions.set(false);
+    }
+  }
+
+  async selectTag(tag: string) {
+    const fullText = this.context();
+    const cursor = this.cursorPos;
+    const textUpToCursor = fullText.slice(0, cursor);
+    const lastHashIndex = textUpToCursor.lastIndexOf('#');
+
+    if (lastHashIndex !== -1) {
+      const beforeHash = fullText.slice(0, lastHashIndex);
+      const afterCursor = fullText.slice(cursor);
+      const newText = `${beforeHash}#${tag} ${afterCursor}`;
+
+      this.context.set(newText);
+      this.showSuggestions.set(false);
+
+      setTimeout(async () => {
+        const textarea = await this.mainInput.getInputElement();
+        textarea.focus();
+      }, 50);
+    }
+  }
+
+  private extractTags(text: string): string[] {
+    const regex = /#[\w\u00C0-\u1EF9]+/g;
+    const matches = text.match(regex);
+    if (!matches) return [];
+    return [...new Set(matches.map((tag) => tag.substring(1)))];
   }
 
   cancel() {
@@ -416,21 +636,23 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
   }
 
   async save() {
-    const text = this.context();
-    if (!text) return;
+    const rawText = this.context();
+    if (!rawText) return;
 
     await Haptics.impact({ style: ImpactStyle.Medium });
     this.isSaving.set(true);
 
     try {
-      const emotionStr = Array.from(this.selectedEmotions()).join(',');
+      const extractedTags = this.extractTags(rawText);
+      extractedTags.forEach((t) => this.tagService.addTagToCache(t));
 
+      const emotionStr = Array.from(this.selectedEmotions()).join(',');
       const newEvent: SelfOpsEvent = {
         uuid: AppUtils.generateUUID(),
         type: this.selectedType(),
-        context: text,
+        context: rawText,
         emotion: emotionStr,
-        tags: [],
+        tags: extractedTags,
         meta_data: [],
         is_reviewed: false,
         review_due_date: Date.now() + ONE_WEEK_MS,

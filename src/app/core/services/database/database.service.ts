@@ -62,10 +62,11 @@ export class DatabaseService {
     page: number,
     size: number,
     type: string = 'ALL',
-    search: string = ''
+    search: string = '',
+    tag: string = ''
   ) {
     await this.ensureDbReady();
-    return this.eventRepo.getPaging(page, size, type, search);
+    return this.eventRepo.getPaging(page, size, type, search, tag);
   }
 
   async getAllEvents() {
@@ -123,9 +124,9 @@ export class DatabaseService {
     return this.eventRepo.countPending();
   }
 
-  async countEventsByFilter(type: string, search: string) {
+  async countEventsByFilter(type: string, search: string, tag: string = '') {
     await this.ensureDbReady();
-    return this.eventRepo.countByFilterAndSearch(type, search);
+    return this.eventRepo.countByFilterAndSearch(type, search, tag);
   }
 
   // ================= DAILY LOG =================

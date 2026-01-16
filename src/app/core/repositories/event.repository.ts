@@ -12,6 +12,102 @@ import { AppUtils } from '../utils/app.utils';
 export class EventRepository {
   private sql = inject(SqliteConnectionService);
 
+  private readonly DUMMY_SCENARIOS = [
+    // --- MISTAKE (Sai lầm / Sự cố) ---
+    {
+      context: 'Deploy production bị lỗi CSS vỡ layout mobile',
+      type: SelfOpsEventType.MISTAKE,
+      tags: ['coding', 'frontend', 'deploy', 'production'],
+    },
+    {
+      context: 'Quên backup database trước khi chạy migration',
+      type: SelfOpsEventType.MISTAKE,
+      tags: ['database', 'devops', 'risk'],
+    },
+    {
+      context: 'Lỡ lời tranh cãi gay gắt với PM trong cuộc họp',
+      type: SelfOpsEventType.MISTAKE,
+      tags: ['communication', 'soft-skill', 'meeting'],
+    },
+    {
+      context: 'Estimate sai task dẫn đến trễ deadline 2 ngày',
+      type: SelfOpsEventType.MISTAKE,
+      tags: ['planning', 'management', 'time'],
+    },
+    {
+      context: 'Merge code vào nhánh master mà chưa resolve conflict kỹ',
+      type: SelfOpsEventType.MISTAKE,
+      tags: ['git', 'coding', 'teamwork'],
+    },
+
+    // --- DECISION (Quyết định) ---
+    {
+      context: 'Quyết định refactor lại module User sang kiến trúc mới',
+      type: SelfOpsEventType.DECISION,
+      tags: ['refactor', 'architecture', 'backend'],
+    },
+    {
+      context: 'Chốt phương án sử dụng Ionic thay vì Flutter cho dự án mới',
+      type: SelfOpsEventType.DECISION,
+      tags: ['tech-stack', 'mobile', 'research'],
+    },
+    {
+      context: 'Từ chối làm thêm tính năng ngoài scope để bảo vệ team',
+      type: SelfOpsEventType.DECISION,
+      tags: ['management', 'leadership', 'negotiation'],
+    },
+    {
+      context: 'Đầu tư mua khóa học System Design nâng cao',
+      type: SelfOpsEventType.DECISION,
+      tags: ['learning', 'career', 'investment'],
+    },
+    {
+      context: 'Chuyển server từ AWS sang DigitalOcean để tiết kiệm chi phí',
+      type: SelfOpsEventType.DECISION,
+      tags: ['devops', 'finance', 'cloud'],
+    },
+
+    // --- STRESS (Căng thẳng / Cảm xúc) ---
+    {
+      context: 'Server bị quá tải, request timeout liên tục lúc 2h sáng',
+      type: SelfOpsEventType.STRESS,
+      tags: ['incident', 'server', 'stress'],
+    },
+    {
+      context: 'Khách hàng thay đổi yêu cầu phút chót trước khi demo',
+      type: SelfOpsEventType.STRESS,
+      tags: ['client', 'change-request', 'pressure'],
+    },
+    {
+      context: 'Debug lỗi memory leak suốt 5 tiếng chưa ra',
+      type: SelfOpsEventType.STRESS,
+      tags: ['bug', 'coding', 'performance'],
+    },
+    {
+      context: 'Cảm thấy burnout vì làm việc liên tục 12 tiếng/ngày',
+      type: SelfOpsEventType.STRESS,
+      tags: ['health', 'burnout', 'work-life-balance'],
+    },
+    {
+      context: 'Lo lắng về tình hình cắt giảm nhân sự của công ty',
+      type: SelfOpsEventType.STRESS,
+      tags: ['career', 'job-security', 'anxiety'],
+    },
+  ];
+
+  private readonly DUMMY_EMOTIONS = [
+    'Lo lắng',
+    'Tức giận',
+    'Hào hứng',
+    'Mệt mỏi',
+    'Tự tin',
+    'Vội vàng',
+    'Buồn',
+    'Biết ơn',
+    'Bất lực',
+    'Hy vọng',
+  ];
+
   async add(event: SelfOpsEvent) {
     const tagsStr = JSON.stringify(event.tags || []);
     const metaStr = JSON.stringify(event.meta_data || {});
@@ -23,6 +119,9 @@ export class EventRepository {
         INSERT INTO events (uuid, type, context, emotion, tags, meta_data, created_at, review_due_date, reflection, is_reviewed) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
+
+      console.log('>> tagsStr', tagsStr);
+
       await this.sql.run(query, [
         event.uuid,
         event.type,
@@ -81,7 +180,8 @@ export class EventRepository {
     page: number,
     size: number,
     filterType?: string,
-    searchQuery?: string
+    searchQuery?: string,
+    filterTag?: string
   ): Promise<SelfOpsEvent[]> {
     if (this.sql.isWeb) {
       let all = await this.getAllFromWeb();
@@ -115,6 +215,12 @@ export class EventRepository {
       if (searchQuery && searchQuery.trim() !== '') {
         query += ' AND (context LIKE ? OR emotion LIKE ?)';
         params.push(`%${searchQuery}%`, `%${searchQuery}%`);
+      }
+
+      // Vì tags lưu dạng '["code","bug"]', ta dùng LIKE '%"tag"%' để tìm chính xác
+      if (filterTag) {
+        query += ` AND tags LIKE ?`;
+        params.push(`%"${filterTag}"%`);
       }
 
       query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
@@ -185,7 +291,11 @@ export class EventRepository {
   }
 
   // Thêm hàm đếm search
-  async countByFilterAndSearch(type: string, search: string): Promise<number> {
+  async countByFilterAndSearch(
+    type: string,
+    search: string,
+    filterTag?: string
+  ): Promise<number> {
     if (this.sql.isWeb) {
       let all = await this.getAllFromWeb();
       if (type && type !== 'ALL') {
@@ -213,6 +323,11 @@ export class EventRepository {
       if (search && search.trim() !== '') {
         query += ' AND (context LIKE ? OR emotion LIKE ?)';
         params.push(`%${search}%`, `%${search}%`);
+      }
+
+      if (filterTag) {
+        query += ` AND tags LIKE ?`;
+        params.push(`%"${filterTag}"%`);
       }
 
       const res = await this.sql.query(query, params);
@@ -263,50 +378,62 @@ export class EventRepository {
     };
   }
 
-  // SEEDING DATA (Logic tạo dữ liệu giả)
-  private createDummyEvent(index: number): SelfOpsEvent {
-    const contexts = [
-      'Deploy production bị lỗi CSS',
-      'Quyết định refactor lại module User',
-      'Tranh luận với PM về tính năng mới',
-      'Quên backup database trước khi update',
-      'Tìm ra giải pháp fix bug memory leak',
-      'Review code của junior và phát hiện lỗi bảo mật',
-      'Họp team chốt phương án marketing',
-      'Server bị quá tải do lượng request tăng đột biến',
-      'Được khách hàng khen ngợi về giao diện mới',
-      'Lỡ tay xóa nhầm config file quan trọng',
-    ];
-    const emotions = [
-      'Lo lắng',
-      'Tức giận',
-      'Hào hứng',
-      'Mệt mỏi',
-      'Tự tin',
-      'Vội vàng',
-      'Buồn',
-      'Biết ơn',
-    ];
-    const types = Object.values(SelfOpsEventType);
+  // Lấy toàn bộ chuỗi JSON tags từ DB (Chỉ lấy cột tags => Siêu nhẹ)
+  async getAllTagsRaw(): Promise<string[]> {
+    if (this.sql.isWeb) {
+      const all = await this.getAllFromWeb();
+      // Map ra mảng các chuỗi tag array
+      return all.map((e) => JSON.stringify(e.tags || []));
+    } else {
+      // Chỉ select cột tags, bỏ qua các dòng không có tag
+      const query = `SELECT tags FROM events WHERE tags IS NOT NULL AND tags != '[]'`;
+      const res = await this.sql.query(query);
+      return (res.values || []).map((r) => r.tags);
+    }
+  }
 
-    // Random ngày trong quá khứ (0 - 30 ngày trước)
-    const daysAgo = Math.floor(Math.random() * 30);
-    const createdTime = Date.now() - daysAgo * 24 * 60 * 60 * 1000;
+  // SEEDING DATA (Logic tạo dữ liệu giả)
+  // 2. Hàm tạo 1 Event giả lập
+  private createDummyEvent(index: number): SelfOpsEvent {
+    // Random kịch bản
+    const scenario =
+      this.DUMMY_SCENARIOS[
+        Math.floor(Math.random() * this.DUMMY_SCENARIOS.length)
+      ];
+    const emotion =
+      this.DUMMY_EMOTIONS[
+        Math.floor(Math.random() * this.DUMMY_EMOTIONS.length)
+      ];
+
+    // Random ngày: Phân bổ dữ liệu đều trong 60 ngày qua
+    const daysAgo = Math.floor(Math.random() * 60);
+    // Random giờ phút để không bị trùng timestamp tuyệt đối
+    const randomTimeOffset = Math.floor(Math.random() * 86400000);
+    const createdTime =
+      Date.now() - daysAgo * 24 * 60 * 60 * 1000 - randomTimeOffset;
+
+    // Tỉ lệ có Reflection (Bài học): 40%
+    const hasReflection = Math.random() > 0.6;
+
+    // Tỉ lệ đã Review: 50%
+    const isReviewed = Math.random() > 0.5;
 
     return {
       uuid: AppUtils.generateUUID(),
-      type: types[Math.floor(Math.random() * types.length)],
-      context: `${
-        contexts[Math.floor(Math.random() * contexts.length)]
-      } (Test #${index + 1})`,
-      emotion: emotions[Math.floor(Math.random() * emotions.length)],
-      tags: [],
-      meta_data: {},
-      is_reviewed: Math.random() > 0.5,
-      review_due_date: createdTime + ONE_WEEK_MS,
+      type: scenario.type,
+      context: `${scenario.context}`, // Có thể thêm suffix nếu muốn debug: ` [Auto #${index}]`
+      emotion: emotion,
+      tags: scenario.tags, // Tags chuẩn theo ngữ cảnh
+      meta_data: {
+        source: 'dummy_seeder',
+        index: index,
+      },
+      is_reviewed: isReviewed,
+      review_due_date: createdTime + ONE_WEEK_MS, // Mặc định review sau 1 tuần
       created_at: createdTime,
-      reflection:
-        Math.random() > 0.7 ? 'Bài học rút ra là cần cẩn thận hơn...' : '',
+      reflection: hasReflection
+        ? `Bài học rút ra: Cần chú ý hơn về vấn đề ${scenario.tags[0]}...`
+        : '',
       actual_outcome: '',
     };
   }
