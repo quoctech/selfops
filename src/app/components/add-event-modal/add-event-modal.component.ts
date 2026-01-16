@@ -45,7 +45,6 @@ import {
 import { DatabaseService } from 'src/app/core/services/database/database.service';
 import { AppUtils } from 'src/app/core/utils/app.utils';
 
-// Static Data: Khai báo ngoài class để không tốn bộ nhớ khởi tạo lại
 const EMOTION_CHIPS = [
   'Lo lắng',
   'Tức giận',
@@ -110,7 +109,7 @@ const EMOTION_CHIPS = [
     </ion-header>
 
     <ion-content class="ion-padding" #content>
-      <div class="segment-container">
+      <div class="segment-container" #segmentContainer>
         <ion-segment
           [value]="selectedType()"
           (ionChange)="onTypeChange($event)"
@@ -183,6 +182,7 @@ const EMOTION_CHIPS = [
         z-index: 100;
         padding-bottom: 16px;
         background: var(--ion-background-color);
+        /* Thêm background mờ để khi text trôi qua bên dưới không bị rối */
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
         will-change: transform;
@@ -245,11 +245,10 @@ const EMOTION_CHIPS = [
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
-        /* Fix layout shift */
         min-height: 40px;
       }
 
-      /* Chip Styles - Tối ưu selector */
+      /* Chip Styles */
       .custom-chip {
         display: inline-flex;
         align-items: center;
@@ -265,13 +264,12 @@ const EMOTION_CHIPS = [
         transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1),
           background-color 0.2s;
         border: 1px solid transparent;
-        /* Performance: Báo trước cho trình duyệt */
         will-change: transform, background-color;
       }
 
       .custom-chip:active {
         transform: scale(0.95);
-      } /* Feedback vật lý */
+      }
 
       .custom-chip.active {
         background-color: var(--ion-color-primary);
@@ -302,7 +300,7 @@ const EMOTION_CHIPS = [
         pointer-events: none;
       }
 
-      /* --- DARK MODE OVERRIDES --- */
+      /* Dark Mode */
       :host-context(body.dark) {
         .segment-container {
           background: var(--ion-color-step-100);
@@ -321,16 +319,12 @@ const EMOTION_CHIPS = [
   ],
 })
 export class AddEventModalComponent implements OnInit, OnDestroy {
-  // Signals quản lý State (Reactive & Performant)
   isSaving = signal(false);
   selectedType = signal<SelfOpsEventType>(SelfOpsEventType.DECISION);
   context = signal('');
-
-  // Tối ưu: Dùng Set để lookup O(1)
   selectedEmotions = signal<Set<string>>(new Set());
 
   readonly emotionChips = EMOTION_CHIPS;
-  // Pre-calculate Labels cho HTML đỡ phải gọi function
   readonly uiEventTypes = Object.values(SelfOpsEventType).map((type) => ({
     value: type,
     label: AppUtils.getTypeConfig(type).label,
@@ -339,6 +333,9 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
   @ViewChild('content') content!: IonContent;
   @ViewChild('inputContainer', { read: ElementRef })
   inputContainer!: ElementRef;
+
+  @ViewChild('segmentContainer', { read: ElementRef })
+  segmentContainer!: ElementRef;
 
   private modalCtrl = inject(ModalController);
   private databaseService = inject(DatabaseService);
@@ -376,9 +373,18 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
     this.keyboardListener = await Keyboard.addListener(
       'keyboardDidShow',
       () => {
-        const el = this.inputContainer.nativeElement;
-        const y = el.offsetTop - 16;
-        this.content.scrollToPoint(0, y, 300);
+        // 1. Lấy vị trí top của ô input
+        const inputTop = this.inputContainer.nativeElement.offsetTop;
+
+        // 2. Lấy chiều cao của segment đang sticky ở trên
+        const segmentHeight =
+          this.segmentContainer?.nativeElement?.offsetHeight || 0;
+
+        // 3. Tính toán vị trí scroll: Trừ đi chiều cao segment và thêm chút khoảng hở (16px)
+        const y = inputTop - segmentHeight - 16;
+
+        // 4. Scroll tới vị trí đó
+        this.content.scrollToPoint(0, Math.max(0, y), 300);
       }
     );
 
@@ -400,8 +406,6 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
 
   toggleEmotion(emo: string) {
     Haptics.impact({ style: ImpactStyle.Light });
-
-    // Update Set immutable way
     const currentSet = new Set(this.selectedEmotions());
     if (currentSet.has(emo)) {
       currentSet.delete(emo);
@@ -424,7 +428,6 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
 
     try {
       const emotionStr = Array.from(this.selectedEmotions()).join(',');
-
       const newEvent: SelfOpsEvent = {
         uuid: AppUtils.generateUUID(),
         type: this.selectedType(),
