@@ -254,38 +254,65 @@ export class EventRepository {
     }
   }
 
-  async getByReviewStatus(isReviewed: boolean): Promise<SelfOpsEvent[]> {
-    const statusVal = isReviewed ? 1 : 0;
+  async getEventsByReviewStatus(isReviewed: boolean): Promise<SelfOpsEvent[]> {
+    const now = AppUtils.getNow();
 
     if (this.sql.isWeb) {
+      // --- LOGIC WEB ---
       const all = await this.getAllFromWeb();
       return all
-        .filter((e) => !!e.is_reviewed === isReviewed)
+        .filter((e) => {
+          const statusMatch = !!e.is_reviewed === isReviewed;
+
+          // QUAN TRỌNG:
+          // Nếu là Tab Chờ Review (false) -> Chỉ lấy cái nào ĐÃ ĐẾN HẠN (<= now)
+          if (!isReviewed) {
+            return statusMatch && e.review_due_date <= now;
+          }
+          // Nếu Tab Đã Review -> Lấy hết
+          return statusMatch;
+        })
         .sort((a, b) => {
-          if (isReviewed) return (b.updated_at || 0) - (a.updated_at || 0); // Mới review lên đầu
-          return a.review_due_date - b.review_due_date; // Hết hạn lên đầu
+          // Sắp xếp:
+          // - Đã review: Mới nhất lên đầu (updated_at giảm dần)
+          // - Chưa review: Cái nào hết hạn lâu nhất lên đầu (deadline tăng dần) để ưu tiên xử lý
+          if (isReviewed) return (b.updated_at || 0) - (a.updated_at || 0);
+          return a.review_due_date - b.review_due_date;
         });
     } else {
-      // NATIVE: Tối ưu SQL
-      // Pending -> Sắp xếp theo Deadline (càng gấp càng lên trên)
-      // Reviewed -> Sắp xếp theo ngày Review (mới làm xong lên trên)
+      // --- LOGIC NATIVE (SQLite) ---
       const orderBy = isReviewed ? 'updated_at DESC' : 'review_due_date ASC';
+      let query = '';
+      let params: any[] = [];
 
-      const query = `SELECT * FROM events WHERE is_reviewed = ? ORDER BY ${orderBy}`;
+      if (isReviewed) {
+        // Tab Đã Review: Lấy bình thường
+        query = `SELECT * FROM events WHERE is_reviewed = 1 ORDER BY ${orderBy}`;
+      } else {
+        // Tab Chờ Review: Thêm điều kiện Time Capsule (review_due_date <= ?)
+        query = `SELECT * FROM events WHERE is_reviewed = 0 AND review_due_date <= ? ORDER BY ${orderBy}`;
+        params = [now];
+      }
 
-      const res = await this.sql.query(query, [statusVal]);
+      const res = await this.sql.query(query, params);
       return (res.values || []).map(this.mapRowToEvent);
     }
   }
 
   // Hàm đếm nhanh (Lightweight count)
-  async countPending(): Promise<number> {
+  async getPendingCount(): Promise<number> {
+    const now = AppUtils.getNow();
+
     if (this.sql.isWeb) {
-      return (await this.getAllFromWeb()).filter((e) => !e.is_reviewed).length;
+      const all = await this.getAllFromWeb();
+      // Chỉ đếm những cái chưa review VÀ đã đến hạn
+      return all.filter((e) => !e.is_reviewed && e.review_due_date <= now)
+        .length;
     } else {
-      const res = await this.sql.query(
-        'SELECT COUNT(*) as c FROM events WHERE is_reviewed = 0'
-      );
+      // NATIVE SQL
+      const query =
+        'SELECT COUNT(*) as c FROM events WHERE is_reviewed = 0 AND review_due_date <= ?';
+      const res = await this.sql.query(query, [now]);
       return res.values?.[0]?.c || 0;
     }
   }

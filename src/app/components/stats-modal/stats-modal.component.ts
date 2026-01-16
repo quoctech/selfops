@@ -17,7 +17,14 @@ import {
   ModalController,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { barChartOutline, close, trendingUpOutline } from 'ionicons/icons';
+import {
+  alertCircleOutline,
+  barChartOutline,
+  batteryDeadOutline,
+  close,
+  helpBuoyOutline,
+  trendingUpOutline,
+} from 'ionicons/icons';
 
 import { SelfOpsEvent, SelfOpsEventType } from 'src/app/core/models/event.type';
 import { AppUtils } from 'src/app/core/utils/app.utils';
@@ -479,7 +486,14 @@ export class StatsModalComponent implements OnInit, OnDestroy {
   protected animationProgress = signal(0);
 
   constructor() {
-    addIcons({ close, trendingUpOutline, barChartOutline });
+    addIcons({
+      close,
+      trendingUpOutline,
+      barChartOutline,
+      alertCircleOutline,
+      helpBuoyOutline,
+      batteryDeadOutline,
+    });
   }
 
   ngOnInit() {

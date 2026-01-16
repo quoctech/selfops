@@ -117,11 +117,11 @@ export class DatabaseService {
 
   async getEventsByReviewStatus(isReviewed: boolean) {
     await this.ensureDbReady();
-    return this.eventRepo.getByReviewStatus(isReviewed);
+    return this.eventRepo.getEventsByReviewStatus(isReviewed);
   }
 
   async getPendingCount() {
-    return this.eventRepo.countPending();
+    return this.eventRepo.getPendingCount();
   }
 
   async countEventsByFilter(type: string, search: string, tag: string = '') {

@@ -1,12 +1,13 @@
-import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   OnInit,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import {
   IonButton,
@@ -14,17 +15,12 @@ import {
   IonCardContent,
   IonIcon,
   IonRange,
+  IonRippleEffect,
   IonSpinner,
   IonTextarea,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import {
-  checkmarkCircle,
-  happyOutline,
-  sadOutline,
-  saveOutline,
-} from 'ionicons/icons';
-import { Subject, takeUntil } from 'rxjs';
+import { checkmarkCircle } from 'ionicons/icons';
 import { DatabaseService } from 'src/app/core/services/database/database.service';
 
 @Component({
@@ -32,7 +28,6 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule,
     FormsModule,
     IonCard,
     IonCardContent,
@@ -41,71 +36,95 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
     IonTextarea,
     IonButton,
     IonSpinner,
+    IonRippleEffect,
   ],
   template: `
-    <ion-card class="checkin-card">
+    <ion-card class="checkin-card gpu-layer">
       <ion-card-content class="card-inner">
         @if (hasCheckedIn()) {
-        <div class="done-state fade-in">
-          <div class="score-circle" [style.--circle-color]="scoreColor()">
-            {{ score() }}
+        <div class="done-widget fade-in">
+          <div class="emoji-circle" [style.background]="scoreColor() + '15'">
+            <span class="emoji-vibe">{{ scoreEmoji() }}</span>
           </div>
-          <div class="message">
-            <h3>Đã lưu vào hồ sơ</h3>
-            <p>"{{ reason() || 'Một ngày không lời' }}"</p>
+
+          <div class="info-col">
+            <div class="status-row">
+              <span class="score-num" [style.color]="scoreColor()">{{
+                score()
+              }}</span>
+              <span class="status-label">{{ scoreLabel() }}</span>
+            </div>
+            <div class="note-text text-truncate">
+              "{{ reason() || 'Một ngày bình ổn.' }}"
+            </div>
           </div>
-          <ion-icon
-            name="checkmark-circle"
-            color="success"
-            class="check-icon"
-          ></ion-icon>
+
+          <div class="check-col">
+            <ion-icon name="checkmark-circle" color="success"></ion-icon>
+          </div>
         </div>
         } @else {
-        <div class="header-row">
-          <div class="question-box">
-            <h3>Hôm nay bạn chấm mình mấy điểm?</h3>
-            <p class="score-desc" [style.color]="scoreColor()">
-              {{ scoreLabel() }}
-            </p>
+        <div class="header-section">
+          <div
+            class="dynamic-emoji-wrapper"
+            [style.background]="scoreColor() + '15'"
+          >
+            <span class="main-emoji bounce-in">
+              {{ scoreEmoji() }}
+            </span>
           </div>
-          <div class="score-badge" [style.color]="scoreColor()">
-            {{ score() }}
+
+          <div class="text-group">
+            <h3>Tâm trạng của bạn?</h3>
+            <div class="score-display">
+              <span class="big-score" [style.color]="scoreColor()">{{
+                score()
+              }}</span>
+              <span
+                class="label-badge"
+                [style.background]="scoreColor() + '15'"
+                [style.color]="scoreColor()"
+              >
+                {{ scoreLabel() }}
+              </span>
+            </div>
           </div>
         </div>
 
-        <ion-range
-          [ngModel]="score()"
-          (ionInput)="onRangeChange($event)"
-          [min]="0"
-          [max]="100"
-          [pin]="true"
-          [debounce]="0"
-          mode="ios"
-          class="custom-range"
-        >
-          <ion-icon slot="start" name="sad-outline" color="medium"></ion-icon>
-          <ion-icon slot="end" name="happy-outline" color="warning"></ion-icon>
-        </ion-range>
+        <div class="slider-wrapper">
+          <ion-range
+            [ngModel]="score()"
+            (ionInput)="onRangeChange($event)"
+            [min]="0"
+            [max]="100"
+            mode="ios"
+            class="custom-range"
+            [style.--active-color]="scoreColor()"
+          >
+            <span slot="start" class="range-hint">😫</span>
+            <span slot="end" class="range-hint">🤣</span>
+          </ion-range>
+        </div>
 
         <div class="input-area">
           <ion-textarea
             [(ngModel)]="reason"
-            placeholder="Bạn hôm nay thế nào?"
+            placeholder="Ghi chú nhanh..."
             rows="1"
             [autoGrow]="true"
-            class="reason-input"
+            class="custom-textarea"
             enterkeyhint="done"
           ></ion-textarea>
 
           <ion-button
             (click)="submit()"
             [disabled]="isSaving()"
-            class="submit-btn"
-            color="primary"
+            class="save-btn ion-activatable ripple-parent"
           >
             @if (isSaving()) {
-            <ion-spinner name="crescent"></ion-spinner>
+            <ion-spinner name="crescent" class="btn-spinner"></ion-spinner>
             } @else { Chốt }
+            <ion-ripple-effect></ion-ripple-effect>
           </ion-button>
         </div>
         }
@@ -114,215 +133,271 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
   `,
   styles: [
     `
-      /* --- CARD CONTAINER --- */
       .checkin-card {
-        margin: 0 0 24px 0;
-        border-radius: 20px;
+        margin: 16px 0 0 0;
+        border-radius: 24px;
         background: var(--ion-card-background);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-        border: 1px solid var(--ion-color-light-shade);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.03);
+        border: 1px solid var(--ion-border-color);
+        contain: content;
       }
-
       .card-inner {
-        padding: 16px;
+        padding: 18px;
       }
 
-      /* --- HEADER ROW --- */
-      .header-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 12px;
-        margin-bottom: 12px;
-      }
-      .question-box h3 {
-        margin: 0 0 4px 0;
-        font-size: 1rem;
-        font-weight: 700;
-        line-height: 1.3;
-        color: var(--ion-text-color);
-      }
-      .score-desc {
-        margin: 0;
-        font-size: 0.9rem;
-        font-weight: 600;
-        transition: color 0.2s ease;
-      }
-      .score-badge {
-        font-size: 1.5rem;
-        font-weight: 800;
-        min-width: 44px;
-        text-align: right;
-        line-height: 1;
-      }
-
-      /* --- RANGE SLIDER --- */
-      .custom-range {
-        padding-top: 0;
-        padding-bottom: 12px;
-        --bar-height: 6px;
-        --bar-border-radius: 4px;
-        --knob-size: 24px;
-        --knob-box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-      }
-
-      /* --- INPUT AREA (Chat-like) --- */
-      .input-area {
-        display: flex;
-        gap: 12px;
-        align-items: flex-end;
-      }
-
-      .reason-input {
-        --background: var(
-          --ion-color-step-50,
-          #f6f6f6
-        ); /* Auto Dark Mode support */
-        --padding-start: 16px;
-        --padding-end: 16px;
-        --padding-top: 16px;
-        --padding-bottom: 16px;
-        --border-radius: 24px;
-        font-size: 0.8rem;
-        min-height: 48px;
-        flex: 1;
-        border: 1px solid transparent;
-        transition: all 0.2s;
-      }
-      /* Fix Dark Mode Background */
-      :host-context(body.dark) .reason-input {
-        --background: var(--ion-color-step-100);
-      }
-
-      .reason-input.ion-focused {
-        border-color: var(--ion-color-primary);
-        transform: translateY(-1px);
-      }
-
-      .submit-btn {
-        margin: 0;
-        height: 48px;
-        width: 70px;
-        font-weight: 700;
-        --border-radius: 16px;
-        --box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.3);
-      }
-
-      /* --- DONE STATE --- */
-      .done-state {
+      /* === DONE WIDGET (Sau khi chốt) === */
+      .done-widget {
         display: flex;
         align-items: center;
-        gap: 16px;
-        padding: 6px 0;
+        gap: 14px;
       }
-      .score-circle {
+      .emoji-circle {
         width: 52px;
         height: 52px;
-        border-radius: 50%;
+        border-radius: 16px;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #fff; /* Chữ luôn trắng để nổi trên nền màu */
-        font-weight: 800;
-        font-size: 1.3rem;
-        background: var(--circle-color);
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        font-size: 26px;
       }
-      .message {
+      .info-col {
         flex: 1;
+        min-width: 0;
       }
-      .message h3 {
-        margin: 0 0 4px 0;
-        font-size: 1rem;
+      .status-row {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+      }
+      .score-num {
+        font-size: 1.4rem;
+        font-weight: 900;
+        letter-spacing: -1px;
+      }
+      .status-label {
+        font-size: 0.85rem;
+        font-weight: 800;
+        text-transform: uppercase;
         color: var(--ion-text-color);
-        font-weight: 700;
       }
-      .message p {
-        margin: 0;
-        font-size: 0.9rem;
+      .note-text {
+        font-size: 0.85rem;
         color: var(--ion-color-medium);
         font-style: italic;
+        margin-top: -2px;
       }
-      .check-icon {
-        font-size: 28px;
-        opacity: 0.8;
+      .text-truncate {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .check-col {
+        font-size: 1.6rem;
       }
 
-      /* Animation */
-      .fade-in {
-        animation: fadeIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+      /* === HEADER SECTION === */
+      .header-section {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 20px;
       }
-      @keyframes fadeIn {
-        from {
+      .dynamic-emoji-wrapper {
+        width: 72px;
+        height: 72px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 22px;
+        transition: background 0.3s ease;
+      }
+      .main-emoji {
+        font-size: 42px;
+        display: block;
+      }
+
+      .text-group h3 {
+        margin: 0 0 4px 0;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--ion-color-medium);
+      }
+      .score-display {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .big-score {
+        font-size: 2.2rem;
+        font-weight: 900;
+        line-height: 1;
+        letter-spacing: -1px;
+      }
+      .label-badge {
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-size: 0.7rem;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      /* === SLIDER === */
+      .slider-wrapper {
+        margin-bottom: 20px;
+        padding: 0 4px;
+      }
+      .custom-range {
+        --bar-height: 8px;
+        --bar-border-radius: 10px;
+        --knob-size: 28px;
+        --bar-background: var(--ion-color-light);
+        --bar-background-active: var(--active-color);
+        --knob-background: #fff;
+        --knob-box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+      }
+      .range-hint {
+        font-size: 1.4rem;
+        padding: 0 8px;
+      }
+
+      /* === INPUT AREA === */
+      .input-area {
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+      }
+      .custom-textarea {
+        --background: var(--ion-color-light);
+        --padding-start: 16px;
+        --padding-end: 16px;
+        --padding-top: 14px;
+        --padding-bottom: 14px;
+        --border-radius: 16px;
+        font-size: 0.95rem;
+        min-height: 48px;
+        flex: 1;
+      }
+
+      .save-btn {
+        margin: 0;
+        height: 48px;
+        min-width: 64px;
+        font-weight: 800;
+        --border-radius: 16px;
+        --background: var(--btn-basic-bg);
+        --color: var(--btn-basic-text);
+      }
+
+      /* === ANIMATIONS === */
+      .bounce-in {
+        animation: bounceIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+      @keyframes bounceIn {
+        0% {
+          transform: scale(0.5);
           opacity: 0;
-          transform: translateY(5px);
         }
-        to {
+        70% {
+          transform: scale(1.1);
+        }
+        100% {
+          transform: scale(1);
           opacity: 1;
-          transform: translateY(0);
+        }
+      }
+      .fade-in {
+        animation: fadeIn 0.5s ease-out;
+      }
+
+      :host-context(body.dark) {
+        .custom-textarea {
+          --background: #1e1e20;
+        }
+        .dynamic-emoji-wrapper {
+          border: 1px solid rgba(255, 255, 255, 0.05);
         }
       }
     `,
   ],
 })
 export class DailyCheckInComponent implements OnInit {
-  private databaseService = inject(DatabaseService);
-  private destroy$ = new Subject<void>();
+  private db = inject(DatabaseService);
+  private destroyRef = inject(DestroyRef);
 
   score = signal(50);
   reason = signal('');
   isSaving = signal(false);
   hasCheckedIn = signal(false);
 
-  // 1. Tối ưu: Sử dụng Ionic Variables cho màu sắc (Hỗ trợ Dark Mode)
-  scoreColor = computed(() => {
+  // --- LOGIC: 5 Levels of Emotion with modern Emojis ---
+  scoreConfig = computed(() => {
     const s = this.score();
-    if (s >= 80) return 'var(--ion-color-success)';
-    if (s >= 60) return 'var(--ion-color-secondary)'; // Thay hex bằng variable
-    if (s >= 40) return 'var(--ion-color-warning)';
-    if (s >= 20) return 'var(--ion-color-danger)';
-    return 'var(--ion-color-medium)'; // Thay hex bằng variable
+    // 0-20: Tệ (Rất buồn)
+    if (s <= 20)
+      return {
+        color: '#EF4444', // Danger Red
+        emoji: '😫',
+        label: 'Tệ hại',
+      };
+    // 21-40: Áp lực (Hơi buồn/mệt)
+    if (s <= 40)
+      return {
+        color: '#F59E0B', // Warning Orange
+        emoji: '🙁',
+        label: 'Áp lực',
+      };
+    // 41-60: Bình thường (Ổn)
+    if (s <= 60)
+      return {
+        color: '#6B7280', // Gray/Medium
+        emoji: '😐',
+        label: 'Bình thường',
+      };
+    // 61-80: Tốt (Vui)
+    if (s <= 80)
+      return {
+        color: '#3B82F6', // Primary Blue
+        emoji: '🙂',
+        label: 'Khá tốt',
+      };
+    // 81-95: Tuyệt vời (Rất vui)
+    if (s <= 95)
+      return {
+        color: '#10B981', // Success Green
+        emoji: '😂',
+        label: 'Tuyệt vời',
+      };
+    // 96-100: Đỉnh cao (Cười rớt nước mắt)
+    return {
+      color: '#8B5CF6', // Purple Accent
+      emoji: '🤣',
+      label: 'Đỉnh cao',
+    };
   });
 
-  scoreLabel = computed(() => {
-    const s = this.score();
-    if (s >= 90) return 'Tuyệt vời 🤩'; // Rút gọn text cho đỡ rườm rà
-    if (s >= 75) return 'Năng suất 😊';
-    if (s >= 60) return 'Khá ổn 🙂';
-    if (s >= 40) return 'Bình thường 😐';
-    if (s >= 25) return 'Áp lực 😕';
-    if (s >= 10) return 'Mệt mỏi 😞';
-    return 'Tệ hại 💀';
-  });
+  scoreColor = computed(() => this.scoreConfig().color);
+  scoreEmoji = computed(() => this.scoreConfig().emoji);
+  scoreLabel = computed(() => this.scoreConfig().label);
 
   constructor() {
-    addIcons({ happyOutline, sadOutline, saveOutline, checkmarkCircle });
+    addIcons({ checkmarkCircle });
   }
 
-  async ngOnInit() {
+  ngOnInit() {
     this.checkStatus();
-
-    // Lắng nghe thay đổi từ DB (Xóa data, restore backup...)
-    this.databaseService.dataChanged$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(() => {
-        this.checkStatus();
-      });
-  }
-
-  ngOnDestroy() {
-    this.destroy$.next();
-    this.destroy$.complete();
+    // Tự động đồng bộ nếu dữ liệu DB thay đổi
+    this.db.dataChanged$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.checkStatus());
   }
 
   async checkStatus() {
-    const log = await this.databaseService.getTodayLog();
+    const log = await this.db.getTodayLog();
     if (log) {
       this.score.set(log.score);
       this.reason.set(log.reason);
       this.hasCheckedIn.set(true);
     } else {
-      // Nếu không tìm thấy log (vừa bị xóa), reset về mặc định
       this.hasCheckedIn.set(false);
       this.score.set(50);
       this.reason.set('');
@@ -334,9 +409,10 @@ export class DailyCheckInComponent implements OnInit {
   }
 
   async submit() {
+    if (this.isSaving()) return;
     this.isSaving.set(true);
     try {
-      await this.databaseService.saveDailyLog(this.score(), this.reason());
+      await this.db.saveDailyLog(this.score(), this.reason());
       this.hasCheckedIn.set(true);
     } catch (e) {
       console.error(e);
