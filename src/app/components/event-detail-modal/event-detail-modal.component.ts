@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -16,17 +16,12 @@ import { PluginListenerHandle } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import {
   AlertController,
-  IonBadge,
   IonButton,
   IonButtons,
-  IonCard,
-  IonCardContent,
-  IonCardHeader,
-  IonChip,
   IonContent,
+  IonFooter,
   IonHeader,
   IonIcon,
-  IonLabel,
   IonSpinner,
   IonTextarea,
   IonTitle,
@@ -36,12 +31,10 @@ import {
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
-  bulbOutline,
-  checkmarkCircleOutline,
+  checkmarkOutline,
   closeOutline,
-  heartOutline,
-  helpBuoyOutline,
-  saveOutline,
+  happyOutline,
+  pricetagsOutline,
   timeOutline,
   trashOutline,
 } from 'ionicons/icons';
@@ -54,6 +47,7 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    CommonModule,
     FormsModule,
     DatePipe,
     IonHeader,
@@ -62,26 +56,15 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
     IonButton,
     IonTitle,
     IonContent,
-    IonCard,
-    IonCardHeader,
-    IonCardContent,
+    IonFooter,
     IonTextarea,
     IonIcon,
-    IonBadge,
-    IonChip,
-    IonLabel,
     IonSpinner,
   ],
   template: `
     <ion-header class="ion-no-border">
       <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-button color="medium" (click)="close()">
-            <ion-icon name="close-outline" slot="icon-only"></ion-icon>
-          </ion-button>
-        </ion-buttons>
-
-        <ion-title>Chiêm nghiệm & Đánh giá</ion-title>
+        <ion-title class="modal-title">Chiêm nghiệm</ion-title>
 
         <ion-buttons slot="end">
           <ion-button color="danger" (click)="confirmDelete()">
@@ -91,302 +74,359 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
       </ion-toolbar>
     </ion-header>
 
-    <ion-content class="ion-padding" #content>
+    <ion-content class="ion-padding-horizontal no-scroll-bounce" #content>
       @if (viewState(); as state) {
-      <ion-card class="read-only-card">
-        <ion-card-header>
-          <div class="card-meta">
-            <ion-badge [color]="state.config.color" mode="ios">
-              <ion-icon
-                [name]="state.config.icon"
-                style="margin-right: 4px;"
-              ></ion-icon>
-              {{ state.config.label }}
-            </ion-badge>
-
-            <span class="date-text">
-              <ion-icon name="time-outline"></ion-icon>
-              {{ state.originalEvent.created_at | date : 'short' }}
-            </span>
+      <div class="recap-card top-spacing">
+        <div class="meta-row">
+          <div
+            class="type-pill"
+            [style.background]="
+              'rgba(var(--ion-color-' + state.config.color + '-rgb), 0.1)'
+            "
+            [style.color]="'var(--ion-color-' + state.config.color + ')'"
+          >
+            <ion-icon [name]="state.config.icon"></ion-icon>
+            {{ state.config.label }}
           </div>
-        </ion-card-header>
-
-        <ion-card-content>
-          <p class="context-label">Bạn đã quyết định/suy nghĩ:</p>
-          <p class="context-text">{{ state.originalEvent.context }}</p>
-
-          @if (state.emotions.length > 0) {
-          <div class="emotion-container">
-            @for (emo of state.emotions; track emo) {
-            <ion-chip outline color="medium" class="mini-chip">
-              <ion-label>{{ emo }}</ion-label>
-            </ion-chip>
-            }
+          <div class="time-label">
+            {{ state.originalEvent.created_at | date : 'dd/MM HH:mm' }}
           </div>
+        </div>
+
+        <div class="context-body">
+          {{ state.originalEvent.context }}
+        </div>
+
+        @if (state.tags.length > 0 || state.emotions.length > 0) {
+        <div class="meta-footer">
+          @for (tag of state.tags; track tag) {
+          <span class="meta-chip tag-chip">#{{ tag }}</span>
+          } @for (emo of state.emotions; track emo) {
+          <span class="meta-chip emo-chip">{{ emo }}</span>
           }
-        </ion-card-content>
-      </ion-card>
+        </div>
+        }
+      </div>
       }
 
-      <div class="input-section" #outcomeSection>
-        <div class="section-header">
-          <ion-icon name="checkmark-circle-outline" color="success"></ion-icon>
-          <h3>Kết quả thực tế</h3>
-        </div>
-        <p class="helper-text">
-          Sau 1 thời gian, chuyện gì đã thực sự xảy ra? Có giống kỳ vọng không?
-        </p>
-
-        <div class="input-wrapper">
-          <ion-textarea
-            [ngModel]="actualOutcome()"
-            (ngModelChange)="actualOutcome.set($event)"
-            rows="3"
-            placeholder="Ví dụ: Kết quả tốt hơn mình nghĩ..."
-            class="custom-textarea"
-            [autoGrow]="true"
-            (ionFocus)="setCurrentFocus('outcome')"
-          ></ion-textarea>
-        </div>
-      </div>
-
-      <div class="input-section ion-margin-top" #reflectionSection>
-        <div class="section-header">
-          <ion-icon name="bulb-outline" color="warning"></ion-icon>
-          <h3>Góc nhìn lại</h3>
+      <div class="review-form-container">
+        <div class="input-group" #outcomeSection>
+          <div class="group-label">
+            <ion-icon name="time-outline" color="medium"></ion-icon>
+            Kết quả thực tế
+          </div>
+          <div class="input-box">
+            <ion-textarea
+              class="custom-textarea"
+              [ngModel]="actualOutcome()"
+              (ngModelChange)="actualOutcome.set($event)"
+              rows="3"
+              placeholder="Chuyện gì đã thực sự xảy ra?"
+              [autoGrow]="true"
+              (ionFocus)="setCurrentFocus('outcome')"
+            ></ion-textarea>
+          </div>
         </div>
 
-        <p class="helper-text">
-          Bài học cốt lõi bạn rút ra được để lần sau làm tốt hơn?
-        </p>
-
-        <div class="input-wrapper">
-          <ion-textarea
-            [ngModel]="reflectionNote()"
-            (ngModelChange)="reflectionNote.set($event)"
-            rows="4"
-            placeholder="Ví dụ: Lần sau mình sẽ kiểm tra kỹ hơn..."
-            class="custom-textarea"
-            [autoGrow]="true"
-            (ionFocus)="setCurrentFocus('reflection')"
-          ></ion-textarea>
+        <div class="input-group" #reflectionSection>
+          <div class="group-label">
+            <ion-icon name="happy-outline" color="warning"></ion-icon>
+            Bài học rút ra
+          </div>
+          <div class="input-box">
+            <ion-textarea
+              class="custom-textarea"
+              [ngModel]="reflectionNote()"
+              (ngModelChange)="reflectionNote.set($event)"
+              rows="4"
+              placeholder="Lần sau mình sẽ làm gì tốt hơn?"
+              [autoGrow]="true"
+              (ionFocus)="setCurrentFocus('reflection')"
+            ></ion-textarea>
+          </div>
         </div>
       </div>
 
-      <ion-button
-        expand="block"
-        class="ion-margin-top save-btn"
-        (click)="saveReflection()"
-        [disabled]="isSaving()"
-      >
-        @if (isSaving()) {
-        <ion-spinner name="crescent"></ion-spinner>
-        } @else {
-        <ion-icon name="save-outline" slot="start"></ion-icon>
-        Hoàn tất Review }
-      </ion-button>
-
-      <div class="keyboard-spacer"></div>
+      <div class="footer-spacer"></div>
     </ion-content>
+
+    <ion-footer class="ion-no-border modal-footer">
+      <ion-toolbar class="footer-toolbar">
+        <div class="footer-actions">
+          <ion-button
+            fill="clear"
+            class="btn-icon-round btn-cancel"
+            (click)="close()"
+          >
+            <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+          </ion-button>
+
+          <ion-button
+            shape="circle"
+            color="primary"
+            class="btn-icon-round btn-save"
+            [disabled]="isSaving()"
+            (click)="saveReflection()"
+          >
+            @if (isSaving()) {
+            <ion-spinner name="crescent" color="light"></ion-spinner>
+            } @else {
+            <ion-icon slot="icon-only" name="checkmark-outline"></ion-icon>
+            }
+          </ion-button>
+        </div>
+      </ion-toolbar>
+    </ion-footer>
   `,
   styles: [
     `
-      /* === OPTIMIZED CSS === */
-
-      /* 1. READ ONLY CARD */
-      .read-only-card {
-        margin: 0 0 24px 0;
-        background: var(--ion-color-light);
-        box-shadow: none;
-        border-radius: 16px;
-        border: 1px solid var(--ion-color-light-shade);
-        /* Performance: Tách layer render riêng biệt */
-        contain: content;
+      /* --- GLOBAL --- */
+      ion-content {
+        --background: var(--ion-background-color);
+      }
+      .no-scroll-bounce::part(scroll) {
+        overscroll-behavior-y: none;
+      }
+      .top-spacing {
+        margin-top: 10px;
+      }
+      .modal-title {
+        font-weight: 800;
+        font-size: 1.1rem;
+        opacity: 0.9;
+        text-align: center;
       }
 
-      .card-meta {
+      /* --- 1. RECAP CARD (Styled like a ticket/card) --- */
+      .recap-card {
+        background: var(--ion-color-step-50, #f8f9fa);
+        border: 1px solid var(--ion-color-step-150, #e9ecef);
+        border-radius: 18px;
+        padding: 16px;
+        margin-bottom: 24px;
+        position: relative;
+      }
+
+      .meta-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        margin-bottom: 12px;
       }
-
-      .date-text {
-        font-size: 0.8rem;
-        color: var(--ion-color-medium);
-        display: flex;
+      .type-pill {
+        display: inline-flex;
         align-items: center;
-        gap: 4px;
-      }
-
-      .context-label {
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 8px;
         font-size: 0.75rem;
+        font-weight: 700;
         text-transform: uppercase;
-        color: var(--ion-color-medium);
-        margin-bottom: 6px;
-        font-weight: 600;
         letter-spacing: 0.5px;
       }
+      .time-label {
+        font-size: 0.8rem;
+        color: var(--ion-color-medium);
+        font-weight: 500;
+      }
 
-      .context-text {
-        font-size: 1.1rem;
-        color: var(--ion-text-color);
-        white-space: pre-wrap;
+      .context-body {
+        font-size: 1.05rem;
         line-height: 1.6;
+        color: var(--ion-text-color);
+        font-weight: 500;
         margin-bottom: 16px;
       }
 
-      .emotion-container {
+      .meta-footer {
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
         padding-top: 12px;
-        border-top: 1px dashed var(--ion-color-medium-shade);
+        border-top: 1px dashed var(--ion-color-step-200, #dee2e6);
       }
-      .mini-chip {
-        height: 24px;
-        font-size: 0.8rem;
-        margin: 0;
-      }
-
-      /* 2. INPUT SECTIONS */
-      .input-section {
-        padding: 0 4px;
-      }
-
-      .section-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 4px;
-      }
-      .section-header h3 {
-        margin: 0;
-        font-size: 1.1rem;
+      .meta-chip {
+        font-size: 0.75rem;
+        padding: 4px 10px;
+        border-radius: 12px;
         font-weight: 600;
+      }
+      .tag-chip {
+        background: var(--ion-color-step-150, #e9ecef);
         color: var(--ion-text-color);
       }
-
-      .helper-text {
-        margin: 0 0 12px 0;
-        font-size: 0.9rem;
+      .emo-chip {
+        background: transparent;
+        border: 1px solid var(--ion-color-step-250, #ced4da);
         color: var(--ion-color-medium);
-        line-height: 1.4;
       }
 
-      .input-wrapper {
+      /* --- 2. INPUT FORMS --- */
+      .review-form-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .group-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--ion-color-medium);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding-left: 4px;
+      }
+
+      .input-box {
         background: var(--ion-card-background);
         border: 1px solid var(--ion-color-light-shade);
-        border-radius: 12px;
-        padding: 8px 16px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        /* Performance: Tối ưu paint */
-        contain: layout paint;
+        border-radius: 16px;
+        padding: 12px 16px;
+        transition: all 0.2s;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
       }
-      .input-wrapper:focus-within {
+      .input-box:focus-within {
         border-color: var(--ion-color-primary);
-        box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.1);
+        box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.15);
+        transform: translateY(-1px);
       }
 
       .custom-textarea {
         --padding-start: 0;
-        font-size: 1rem;
+        --padding-end: 0;
+        --padding-top: 0;
+        --placeholder-color: var(--ion-color-step-300);
+        font-size: 1.1rem;
+        line-height: 1.6;
       }
 
-      .save-btn {
-        --border-radius: 12px;
-        height: 48px;
-        font-weight: 600;
-        margin-bottom: 40px;
+      /* --- 3. FOOTER ACTIONS --- */
+      .modal-footer {
+        --background: transparent;
+        padding-bottom: 10px;
+      }
+      .footer-toolbar {
+        --background: transparent;
+        --border-width: 0;
+      }
+      .footer-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 20px;
+        width: 100%;
       }
 
-      .keyboard-spacer {
-        height: 300px;
-        pointer-events: none;
+      .btn-icon-round {
+        width: 60px;
+        height: 60px;
+        margin: 0;
+        --padding-start: 0;
+        --padding-end: 0;
+        --border-radius: 50%;
+        font-size: 1.8rem;
+        transition: transform 0.1s;
+      }
+      .btn-icon-round:active {
+        transform: scale(0.92);
       }
 
-      /* 3. DARK MODE GROUPED */
+      .btn-cancel {
+        --color: var(--ion-color-medium);
+        --background: var(--ion-color-step-100); /* Nền xám nhẹ */
+      }
+
+      .btn-save {
+        --box-shadow: 0 8px 24px rgba(var(--ion-color-primary-rgb), 0.35);
+        font-size: 2rem; /* Icon to hơn chút */
+      }
+
+      .footer-spacer {
+        height: 100px;
+      }
+
+      /* DARK MODE */
       :host-context(body.dark) {
-        .read-only-card {
+        .recap-card {
           background: var(--ion-color-step-100);
           border-color: var(--ion-color-step-200);
         }
-        .input-wrapper {
-          background: var(--ion-color-step-50);
-          border-color: var(--ion-color-step-150);
+        .meta-footer {
+          border-top-color: var(--ion-color-step-200);
         }
-      }
-
-      ion-title {
-        font-size: 0.95rem;
-        padding-inline: 0;
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: 0;
-        bottom: 0;
-        text-align: center;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: -1;
-        pointer-events: none;
+        .tag-chip {
+          background: var(--ion-color-step-200);
+        }
+        .emo-chip {
+          border-color: var(--ion-color-step-300);
+        }
+        .input-box {
+          border-color: var(--ion-color-step-200);
+        }
+        .btn-cancel {
+          --background: var(--ion-color-step-150);
+        }
       }
     `,
   ],
 })
 export class EventDetailModalComponent implements OnInit, OnDestroy {
+  // Input Signal Wrapper
+  private eventInput = signal<SelfOpsEvent | null>(null);
+
+  @Input() set event(val: SelfOpsEvent) {
+    this.eventInput.set(val);
+    this.reflectionNote.set(val.reflection || '');
+    this.actualOutcome.set(val.actual_outcome || '');
+  }
+
   // --- STATE ---
-  private eventSignal = signal<SelfOpsEvent | null>(null);
+  isSaving = signal(false);
+  reflectionNote = signal('');
+  actualOutcome = signal('');
 
-  // Computed View State: Tính toán 1 lần duy nhất khi input thay đổi
-  // Giúp template render cực nhanh, không gọi hàm lặp đi lặp lại.
-  protected viewState = computed(() => {
-    const evt = this.eventSignal();
+  // Computed View State
+  viewState = computed(() => {
+    const evt = this.eventInput();
     if (!evt) return null;
-
     return {
       originalEvent: evt,
       config: AppUtils.getTypeConfig(evt.type),
       emotions: AppUtils.parseEmotions(evt.emotion || ''),
+      tags: evt.tags || [],
     };
   });
 
-  // Editable Signals
-  protected reflectionNote = signal('');
-  protected actualOutcome = signal('');
-  protected isSaving = signal(false);
-
-  // Logic Focus Keyboard
+  // Keyboard & Scroll Logic
   private currentFocus: 'outcome' | 'reflection' | null = null;
+  private keyboardListener: PluginListenerHandle | undefined;
 
   @ViewChild('content') content!: IonContent;
   @ViewChild('outcomeSection', { read: ElementRef }) outcomeEl!: ElementRef;
   @ViewChild('reflectionSection', { read: ElementRef })
   reflectionEl!: ElementRef;
 
-  @Input() set event(val: SelfOpsEvent) {
-    this.eventSignal.set(val);
-    this.reflectionNote.set(val.reflection || '');
-    this.actualOutcome.set(val.actual_outcome || '');
-  }
-
+  // Injects
   private modalCtrl = inject(ModalController);
   private db = inject(DatabaseService);
   private alertCtrl = inject(AlertController);
   private platform = inject(Platform);
-  private keyboardListener: PluginListenerHandle | undefined;
 
   constructor() {
     addIcons({
+      checkmarkOutline,
       trashOutline,
-      saveOutline,
       closeOutline,
       timeOutline,
-      heartOutline,
-      bulbOutline,
-      helpBuoyOutline,
-      checkmarkCircleOutline,
+      happyOutline,
+      pricetagsOutline,
     });
   }
 
@@ -400,7 +440,6 @@ export class EventDetailModalComponent implements OnInit, OnDestroy {
     if (this.keyboardListener) this.keyboardListener.remove();
   }
 
-  // --- KEYBOARD LOGIC ---
   async initKeyboardLogic() {
     this.keyboardListener = await Keyboard.addListener(
       'keyboardDidShow',
@@ -408,15 +447,6 @@ export class EventDetailModalComponent implements OnInit, OnDestroy {
         this.scrollToFocusedInput();
       }
     );
-
-    // FIX: Chỉ bật Accessory Bar nếu là iOS
-    if (this.platform.is('ios')) {
-      try {
-        await Keyboard.setAccessoryBarVisible({ isVisible: true });
-      } catch (e) {
-        console.warn('Keyboard accessory bar error', e);
-      }
-    }
   }
 
   setCurrentFocus(section: 'outcome' | 'reflection') {
@@ -425,22 +455,16 @@ export class EventDetailModalComponent implements OnInit, OnDestroy {
 
   scrollToFocusedInput() {
     if (!this.currentFocus) return;
-
-    if (!this.outcomeEl || !this.reflectionEl) {
-      console.warn('DOM chưa sẵn sàng để scroll');
-      return;
-    }
-
-    // Lấy phần tử an toàn
     const targetRef =
       this.currentFocus === 'outcome' ? this.outcomeEl : this.reflectionEl;
 
-    const targetEl = targetRef.nativeElement;
-    if (!targetEl) return;
-
-    // Scroll section lên sát mép trên (cách 10px)
-    const y = targetEl.offsetTop - 10;
-    this.content.scrollToPoint(0, y, 300);
+    if (targetRef?.nativeElement) {
+      setTimeout(() => {
+        // Scroll nhẹ để input không bị che, chừa khoảng 20px ở trên
+        const y = targetRef.nativeElement.offsetTop - 20;
+        this.content.scrollToPoint(0, y, 300);
+      }, 50);
+    }
   }
 
   close() {
@@ -448,7 +472,7 @@ export class EventDetailModalComponent implements OnInit, OnDestroy {
   }
 
   async saveReflection() {
-    const evt = this.eventSignal();
+    const evt = this.eventInput();
     if (!evt) return;
 
     this.isSaving.set(true);
@@ -469,15 +493,14 @@ export class EventDetailModalComponent implements OnInit, OnDestroy {
   async confirmDelete() {
     const alert = await this.alertCtrl.create({
       header: 'Xác nhận xóa',
-      message:
-        'Bạn có chắc muốn xóa dòng nhật ký này không? Hành động này không thể hoàn tác.',
+      message: 'Bạn muốn xóa dòng nhật ký này?',
       buttons: [
-        { text: 'Giữ lại', role: 'cancel', cssClass: 'secondary' },
+        { text: 'Hủy', role: 'cancel', cssClass: 'secondary' },
         {
-          text: 'Xóa luôn',
+          text: 'Xóa',
           role: 'destructive',
           handler: async () => {
-            const evt = this.eventSignal();
+            const evt = this.eventInput();
             if (evt) {
               await this.db.deleteEvent(evt.uuid);
               this.modalCtrl.dismiss(null, 'deleted');

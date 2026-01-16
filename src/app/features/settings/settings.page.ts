@@ -236,7 +236,7 @@ import { NotificationService } from 'src/app/core/services/notification.service'
           (mousedown)="startPress()"
           (mouseup)="endPress()"
         >
-          <span>v1.2.6</span>
+          <span>v1.2.9</span>
           <span class="dot">•</span>
           <span>Build 2026.01</span>
         </div>
