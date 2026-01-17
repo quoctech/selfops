@@ -666,6 +666,7 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         display: flex;
         flex-direction: column;
         gap: 8px;
+        min-width: 0;
       }
 
       .card-meta {
@@ -694,6 +695,8 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
+        word-break: break-word;
+        overflow-wrap: break-word;
       }
 
       .card-body ::ng-deep p {
