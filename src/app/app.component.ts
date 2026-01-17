@@ -1,13 +1,25 @@
-import { Component, DestroyRef, inject, OnInit } from '@angular/core';
+import { Location } from '@angular/common';
+import {
+  Component,
+  DestroyRef,
+  inject,
+  OnInit,
+  ViewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationStart, Router } from '@angular/router';
+import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard, KeyboardStyle } from '@capacitor/keyboard';
 import { Preferences } from '@capacitor/preferences';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Platform } from '@ionic/angular';
-import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
+import {
+  IonApp,
+  IonRouterOutlet,
+  ToastController,
+} from '@ionic/angular/standalone';
 import { filter } from 'rxjs/operators';
 import { DatabaseService } from './core/services/database/database.service';
 
@@ -20,10 +32,16 @@ import { DatabaseService } from './core/services/database/database.service';
   imports: [IonApp, IonRouterOutlet],
 })
 export class AppComponent implements OnInit {
+  @ViewChild(IonRouterOutlet, { static: true }) routerOutlet!: IonRouterOutlet;
   private platform = inject(Platform);
-  private databaseService = inject(DatabaseService);
-  private router = inject(Router);
   private destroyRef = inject(DestroyRef);
+  private toastCtrl = inject(ToastController);
+  private databaseService = inject(DatabaseService);
+  private location = inject(Location);
+  private router = inject(Router);
+
+  private lastTimeBackPress = 0;
+  private timePeriodToExit = 2000;
 
   constructor() {
     this.fixFocusOnNavigation();
@@ -42,6 +60,8 @@ export class AppComponent implements OnInit {
       if (Capacitor.isNativePlatform()) {
         await SplashScreen.hide();
       }
+
+      this.registerAndroidBackButton();
     });
   }
 
@@ -113,5 +133,53 @@ export class AppComponent implements OnInit {
           document.activeElement.blur();
         }
       });
+  }
+
+  registerAndroidBackButton() {
+    // Priority 10: Đủ thấp để Modal/Alert tự xử lý (Priority của tụi nó là 100+)
+    // Nhưng đủ cao để ghi đè hành động thoát mặc định
+    this.platform.backButton.subscribeWithPriority(10, async () => {
+      // Lấy URL hiện tại (Bỏ qua các query params nếu có)
+      // Ví dụ: /home, /settings
+      const currentUrl = this.router.url.split('?')[0];
+
+      // CHECK: NẾU KHÔNG PHẢI TRANG HOME -> THÌ LÙI TRANG
+      if (currentUrl !== '/home') {
+        // Cách lùi trang chuẩn nhất của Angular
+        this.location.back();
+        return; // Dừng lại, không chạy logic thoát
+      }
+
+      // CHECK: NẾU ĐANG Ở HOME -> CHẠY LOGIC 2 LẦN THOÁT
+      const currentTime = new Date().getTime();
+
+      if (currentTime - this.lastTimeBackPress < this.timePeriodToExit) {
+        App.exitApp();
+      } else {
+        this.showExitToast();
+        this.lastTimeBackPress = currentTime;
+      }
+    });
+  }
+
+  async showExitToast() {
+    const toast = await this.toastCtrl.create({
+      message: 'Ấn lần nữa để thoát',
+      duration: 2000,
+      position: 'bottom',
+      color: 'dark',
+      mode: 'ios',
+      cssClass: 'exit-toast',
+      buttons: [
+        {
+          text: 'Thoát',
+          role: 'cancel',
+          handler: () => {
+            App.exitApp();
+          },
+        },
+      ],
+    });
+    await toast.present();
   }
 }

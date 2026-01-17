@@ -28,11 +28,13 @@ import {
   IonTitle,
   IonToggle,
   IonToolbar,
+  ModalController,
   ToastController,
 } from '@ionic/angular/standalone';
 
 import { addIcons } from 'ionicons';
 import {
+  chatbubbleEllipsesOutline,
   checkmarkOutline,
   chevronForwardOutline,
   closeOutline,
@@ -58,6 +60,7 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 
 // Services
 import { Keyboard, KeyboardStyle } from '@capacitor/keyboard';
+import { FeedbackModalComponent } from 'src/app/components/feedback/feedback.component';
 import { DatabaseService } from 'src/app/core/services/database/database.service';
 import { NotificationService } from 'src/app/core/services/notification.service';
 
@@ -199,6 +202,19 @@ import { NotificationService } from 'src/app/core/services/notification.service'
           </ion-item>
         </ion-list>
 
+        <ion-list [inset]="true" class="premium-list">
+          <ion-list-header>
+            <ion-label>Hỗ trợ</ion-label>
+          </ion-list-header>
+
+          <ion-item button (click)="openFeedback()" class="premium-item">
+            <div class="icon-box green" slot="start">
+              <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+            </div>
+            <ion-label>Gửi góp ý & Báo lỗi</ion-label>
+          </ion-item>
+        </ion-list>
+
         @if (isDevMode()) {
         <div class="dev-zone fade-in">
           <ion-card class="dev-card">
@@ -257,7 +273,7 @@ import { NotificationService } from 'src/app/core/services/notification.service'
             (mousedown)="startPress()"
             (mouseup)="endPress()"
           >
-            v1.3.1 (Build 2026.01)
+            v1.3.2 (Build 2026.01)
           </div>
         </div>
       </div>
@@ -396,6 +412,9 @@ import { NotificationService } from 'src/app/core/services/notification.service'
         color: white;
         font-size: 18px;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      }
+      .icon-box.green {
+        background: linear-gradient(135deg, #34c759, #30b0c7);
       }
       .icon-box.purple {
         background: linear-gradient(135deg, #5856d6, #8e8cec);
@@ -565,6 +584,7 @@ export class SettingsPage implements OnInit {
   private notiService = inject(NotificationService);
   private alertCtrl = inject(AlertController);
   private toastCtrl = inject(ToastController);
+  private modalCtrl = inject(ModalController);
 
   // States
   isDarkMode = signal(false);
@@ -606,6 +626,7 @@ export class SettingsPage implements OnInit {
       infiniteOutline,
       warningOutline,
       rocketOutline,
+      chatbubbleEllipsesOutline,
     });
   }
 
@@ -647,6 +668,13 @@ export class SettingsPage implements OnInit {
     this.isTimeModalOpen.set(true);
   }
 
+  async openFeedback() {
+    const modal = await this.modalCtrl.create({
+      component: FeedbackModalComponent,
+    });
+    await modal.present();
+  }
+
   onTimeModalDismiss() {
     this.isTimeModalOpen.set(false);
   }
@@ -669,7 +697,6 @@ export class SettingsPage implements OnInit {
     }
   }
 
-  // ... (Giữ nguyên các hàm toggleTheme, export, dev mode...)
   async toggleTheme(ev: any) {
     const isDark = ev.detail.checked;
     this.isDarkMode.set(isDark);
