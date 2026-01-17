@@ -1,18 +1,19 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   ElementRef,
+  inject,
   OnDestroy,
   OnInit,
-  ViewChild,
-  computed,
-  inject,
   signal,
+  ViewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PluginListenerHandle } from '@capacitor/core';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { Keyboard } from '@capacitor/keyboard';
+import { Preferences } from '@capacitor/preferences';
 import {
   IonButton,
   IonContent,
@@ -21,7 +22,6 @@ import {
   IonIcon,
   IonRippleEffect,
   IonSpinner,
-  IonTextarea,
   IonTitle,
   IonToolbar,
   ModalController,
@@ -34,7 +34,12 @@ import {
   happyOutline,
   pricetagsOutline,
   saveOutline,
+  trashOutline,
 } from 'ionicons/icons';
+import { ContentChange, QuillModule } from 'ngx-quill';
+import Quill from 'quill';
+import { debounceTime, Subject } from 'rxjs';
+
 import {
   ONE_WEEK_MS,
   SelfOpsEvent,
@@ -60,6 +65,7 @@ const EMOTION_CHIPS = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    QuillModule,
     FormsModule,
     IonHeader,
     IonToolbar,
@@ -67,7 +73,6 @@ const EMOTION_CHIPS = [
     IonButton,
     IonContent,
     IonFooter,
-    IonTextarea,
     IonIcon,
     IonRippleEffect,
     IonSpinner,
@@ -107,17 +112,15 @@ const EMOTION_CHIPS = [
 
       <div class="section-wrapper input-wrapper-relative">
         <div class="input-container" #inputContainer>
-          <ion-textarea
-            #mainInput
-            class="hero-input"
-            [ngModel]="context()"
-            (ngModelChange)="onContextChange($event)"
-            rows="5"
+          <quill-editor
+            [(ngModel)]="eventContent"
+            [modules]="quillModules"
             placeholder="Viết gì đó... #tag"
-            [autoGrow]="true"
-            inputmode="text"
-            autofocus="true"
-          ></ion-textarea>
+            (onContentChanged)="onEditorUpdate($event)"
+            (onEditorCreated)="onEditorCreated($event)"
+            style="display: block; width: 100%;"
+          >
+          </quill-editor>
         </div>
 
         @if (showSuggestions() && filteredTags().length > 0) {
@@ -174,38 +177,45 @@ const EMOTION_CHIPS = [
             <ion-icon slot="icon-only" name="close-outline"></ion-icon>
           </ion-button>
 
-          <ion-button
-            shape="round"
-            [color]="dynamicColor()"
-            class="btn-save"
-            [disabled]="isSaving() || !context()"
-            (click)="save()"
-          >
-            @if (isSaving()) {
-            <ion-spinner name="crescent" color="light"></ion-spinner>
-            } @else {
-            <ion-icon
-              slot="icon-only"
-              name="arrow-up-outline"
-              size="large"
-            ></ion-icon>
-            }
-          </ion-button>
+          <div class="action-group">
+            <ion-button
+              fill="clear"
+              class="btn-icon-only btn-trash"
+              (click)="confirmClear()"
+            >
+              <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+            </ion-button>
+
+            <ion-button
+              shape="round"
+              [color]="dynamicColor()"
+              class="btn-save"
+              [disabled]="isSaving() || !context()"
+              (click)="save()"
+            >
+              @if (isSaving()) {
+              <ion-spinner name="crescent" color="light"></ion-spinner>
+              } @else {
+              <ion-icon
+                slot="icon-only"
+                name="arrow-up-outline"
+                size="large"
+              ></ion-icon>
+              }
+            </ion-button>
+          </div>
         </div>
       </ion-toolbar>
     </ion-footer>
   `,
   styles: [
     `
-      /* --- GLOBAL LAYOUT --- */
       ion-content {
         --background: var(--ion-background-color);
       }
-      /* Chặn scroll nảy trên iOS */
       .no-scroll-bounce::part(scroll) {
         overscroll-behavior-y: none;
       }
-
       .section-wrapper {
         margin-bottom: 20px;
         position: relative;
@@ -221,7 +231,6 @@ const EMOTION_CHIPS = [
         letter-spacing: -0.02em;
       }
 
-      /* --- 1. MINIMAL TABS --- */
       .custom-tabs-wrapper {
         display: flex;
         justify-content: space-between;
@@ -254,7 +263,6 @@ const EMOTION_CHIPS = [
         transform: scaleX(0);
         transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
       }
-
       .tab-item.selected .tab-label {
         color: var(--ion-text-color);
         font-weight: 700;
@@ -264,23 +272,63 @@ const EMOTION_CHIPS = [
         transform: scaleX(1);
       }
 
-      /* --- 2. HERO INPUT --- */
+      /* --- QUILL EDITOR (TỐI ƯU NATIVE & DARK MODE) --- */
       .input-container {
         background: transparent;
-      }
-      .hero-input {
-        --padding-start: 0;
-        --padding-end: 0;
-        --padding-top: 12px;
-        --padding-bottom: 0;
-        --placeholder-color: var(--ion-color-step-300, #999);
-        font-size: 1.4rem;
-        line-height: 1.5;
-        font-weight: 500;
-        min-height: 120px;
+        width: 100%;
+        display: block;
       }
 
-      /* Dropdown Suggestion */
+      /* Khung Editor: Font chữ native */
+      ::ng-deep .ql-container.ql-snow {
+        border: none !important;
+        font-family: var(--ion-font-family, inherit) !important;
+        font-size: 1.1rem !important; /* ~17-18px chuẩn Mobile */
+      }
+
+      /* Vùng nhập liệu: Padding và Line-height thoáng */
+      ::ng-deep .ql-editor {
+        padding: 12px 0 !important; /* Padding trên dưới */
+        min-height: 180px; /* Cao hơn chút để dễ nhìn */
+        color: var(--ion-text-color);
+        line-height: 1.6;
+      }
+
+      /* Placeholder: Màu xám chuẩn */
+      ::ng-deep .ql-editor.ql-blank::before {
+        left: 0 !important;
+        color: var(--ion-color-step-300, #999) !important;
+        font-style: normal !important;
+        opacity: 1;
+      }
+
+      /* Toolbar: Tối giản, viền mảnh */
+      ::ng-deep .ql-toolbar.ql-snow {
+        border: none !important;
+        border-bottom: 0.55px solid var(--ion-color-light-shade) !important;
+        padding: 8px 0 !important;
+        margin-bottom: 8px;
+        background: transparent;
+      }
+
+      /* Ép màu icon theo theme Ionic */
+      ::ng-deep .ql-snow .ql-stroke {
+        stroke: var(--ion-color-medium) !important;
+      }
+      ::ng-deep .ql-snow .ql-fill {
+        fill: var(--ion-color-medium) !important;
+      }
+      ::ng-deep .ql-snow .ql-picker {
+        color: var(--ion-color-medium) !important;
+      }
+      /* Icon khi được Active (Đang chọn) -> Màu Primary */
+      ::ng-deep .ql-snow .ql-active .ql-stroke {
+        stroke: var(--ion-color-primary) !important;
+      }
+      ::ng-deep .ql-snow .ql-active .ql-fill {
+        fill: var(--ion-color-primary) !important;
+      }
+
       .suggestion-dropdown {
         position: absolute;
         top: 100%;
@@ -338,7 +386,6 @@ const EMOTION_CHIPS = [
         }
       }
 
-      /* --- 3. EMOTION CHIPS (Stable Layout) --- */
       .emotion-section {
         margin-top: 10px;
       }
@@ -356,19 +403,17 @@ const EMOTION_CHIPS = [
         flex-wrap: wrap;
         gap: 8px;
       }
-
       .chip-item {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         height: 36px;
         padding: 0 16px;
-        border-radius: 18px; /* Viên thuốc */
+        border-radius: 18px;
         background-color: var(--ion-color-step-50, #f4f5f8);
         color: var(--ion-text-color);
         font-size: 0.9rem;
         font-weight: 500;
-        /* Border transparent giữ kích thước cố định */
         border: 1px solid transparent;
         transition: background-color 0.2s, color 0.2s, transform 0.1s;
         cursor: pointer;
@@ -379,8 +424,6 @@ const EMOTION_CHIPS = [
       .chip-item:active {
         transform: scale(0.95);
       }
-
-      /* Active State: Chỉ đổi màu, không đổi size */
       .chip-item.active {
         background-color: var(--ion-color-primary);
         color: #fff;
@@ -388,10 +431,10 @@ const EMOTION_CHIPS = [
         box-shadow: 0 4px 10px rgba(var(--ion-color-primary-rgb), 0.3);
       }
 
-      /* --- 4. FOOTER ACTIONS --- */
       .modal-footer {
         --background: transparent;
-        padding-bottom: 10px;
+        /* Padding này giúp footer cách đáy/bàn phím 16px */
+        padding-bottom: 16px;
       }
       .footer-toolbar {
         --background: transparent;
@@ -404,6 +447,12 @@ const EMOTION_CHIPS = [
         padding: 0 16px;
         width: 100%;
       }
+      /* Group bên phải chứa Trash + Save */
+      .action-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
 
       .btn-icon-only {
         width: 52px;
@@ -414,30 +463,38 @@ const EMOTION_CHIPS = [
         --border-radius: 50%;
         font-size: 1.5rem;
       }
-
       .btn-cancel {
+        width: 48px;
+        height: 48px;
+        --border-radius: 50%;
         --color: var(--ion-color-medium);
         --background: var(--ion-color-step-100);
+        margin: 0;
       }
-
+      .btn-trash {
+        width: 48px;
+        height: 48px;
+        --border-radius: 50%;
+        --color: var(--ion-color-danger);
+        background: transparent;
+        margin: 0;
+        opacity: 0.8;
+      }
       .btn-save {
         width: 64px;
-        height: 64px; /* Nút Save to hơn để dễ bấm */
+        height: 64px;
         --box-shadow: 0 6px 20px rgba(var(--ion-color-primary-rgb), 0.35);
         font-size: 1.8rem;
+        margin: 0;
       }
-
       .footer-spacer {
         height: 90px;
       }
 
-      /* DARK MODE */
+      /* DARK MODE*/
       :host-context(body.dark) {
         .custom-tabs-wrapper {
           border-bottom-color: var(--ion-color-step-150);
-        }
-        .hero-input {
-          --placeholder-color: var(--ion-color-step-400);
         }
         .chip-item {
           background-color: var(--ion-color-step-150);
@@ -453,25 +510,29 @@ const EMOTION_CHIPS = [
   ],
 })
 export class AddEventModalComponent implements OnInit, OnDestroy {
-  // Services & Injects
   private modalCtrl = inject(ModalController);
   private databaseService = inject(DatabaseService);
   private tagService = inject(TagService);
   private platform = inject(Platform);
 
-  // Signals (State)
+  // State
   isSaving = signal(false);
   selectedType = signal<SelfOpsEventType>(SelfOpsEventType.DECISION);
-  context = signal('');
+  context = signal(''); // Dùng để lưu text thuần (validate nút Save)
   selectedEmotions = signal<Set<string>>(new Set());
 
   // UX State
   showSuggestions = signal(false);
   filteredTags = signal<string[]>([]);
 
-  // Internal
-  private cursorPos = 0;
+  // INTERNAL QUILL
+  eventContent = ''; // Bind với Quill (HTML)
+  private quillInstance: any; // Instance Quill
   private listeners: PluginListenerHandle[] = [];
+
+  // Lưu nháp
+  private draftSubject = new Subject<string>();
+  private readonly DRAFT_KEY = 'ops_event_draft';
 
   readonly emotionChips = EMOTION_CHIPS;
   readonly uiEventTypes = Object.values(SelfOpsEventType).map((type) => ({
@@ -479,7 +540,15 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
     label: AppUtils.getTypeConfig(type).label,
   }));
 
-  @ViewChild('mainInput') mainInput!: IonTextarea;
+  // CẤU HÌNH TOOLBAR
+  readonly quillModules = {
+    toolbar: [
+      ['bold', 'italic'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['clean'],
+    ],
+  };
+
   @ViewChild('content') content!: IonContent;
   @ViewChild('inputContainer', { read: ElementRef })
   inputContainer!: ElementRef;
@@ -491,11 +560,20 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
       pricetagsOutline,
       saveOutline,
       arrowUpOutline,
+      trashOutline,
+    });
+
+    // SETUP AUTO-SAVE LOGIC
+    // Đợi 1000ms (1 giây) sau lần gõ cuối cùng mới lưu xuống bộ nhớ
+    this.draftSubject.pipe(debounceTime(1000)).subscribe((htmlContent) => {
+      this.saveDraftToStorage(htmlContent);
     });
   }
 
   ngOnInit() {
     this.tagService.loadTags();
+    this.loadDraft();
+
     if (this.platform.is('capacitor')) {
       this.initKeyboardListener();
     }
@@ -505,25 +583,139 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
     this.listeners.forEach((h) => h.remove());
   }
 
-  ionViewDidEnter() {
-    // Focus sau 150ms để animation modal mượt hơn
-    setTimeout(() => this.mainInput.setFocus(), 150);
+  // --- 1. XỬ LÝ FOCUS KHI MỞ MODAL ---
+  onEditorCreated(quill: any) {
+    this.quillInstance = quill;
+    setTimeout(() => {
+      if (this.quillInstance && this.quillInstance.hasFocus()) {
+        return;
+      }
+
+      this.quillInstance?.focus();
+    }, 200);
   }
 
-  async initKeyboardListener() {
-    const show = await Keyboard.addListener('keyboardDidShow', () => {
-      // Đẩy nội dung lên nhẹ để tránh bị che
-      setTimeout(() => {
-        const inputTop = this.inputContainer.nativeElement.offsetTop;
-        const y = Math.max(0, inputTop - 60);
-        this.content.scrollToPoint(0, y, 300);
-      }, 50);
+  // --- 2. XỬ LÝ DỮ LIỆU & TAGS (#) ---
+  onEditorUpdate(event: ContentChange) {
+    const text = event.text || '';
+    const html = event.html || '';
+
+    // Cập nhật context để validate nút Save
+    this.context.set(text.trim());
+    this.eventContent = html;
+
+    // Đẩy nội dung vào luồng để chờ lưu
+    this.draftSubject.next(html);
+
+    // Logic detect tag
+    setTimeout(() => this.detectTagLogic(event.editor), 0);
+  }
+
+  detectTagLogic(editor: Quill) {
+    // Lấy vị trí con trỏ hiện tại.
+    // Không cần force=true vì onContentChanged đảm bảo model đã update.
+    const selection = editor.getSelection();
+
+    if (selection) {
+      const index = selection.index;
+
+      // Lấy toàn bộ text từ đầu đến vị trí con trỏ (Sync từ model Quill)
+      const textBefore = editor.getText(0, index);
+      const lastHash = textBefore.lastIndexOf('#');
+
+      if (lastHash !== -1) {
+        // Lấy chuỗi từ sau dấu # đến con trỏ
+        const tagPart = textBefore.slice(lastHash + 1);
+
+        // Logic Check:
+        // 1. tagPart rỗng (vừa gõ #) -> Hợp lệ -> Filter ''
+        // 2. tagPart có chữ (gõ #a) -> Hợp lệ -> Filter 'a'
+        // 3. tagPart có dấu cách (gõ #a b) -> Không hợp lệ -> Ẩn
+        // 4. Kiểm tra không chứa ký tự xuống dòng (\n) để tránh lỗi đa dòng
+
+        if (!/\s/.test(tagPart)) {
+          this.filterTags(tagPart);
+          return; // Kết thúc, giữ dropdown hiện
+        }
+      }
+    }
+
+    // Nếu không thỏa mãn các điều kiện trên thì ẩn gợi ý
+    this.showSuggestions.set(false);
+  }
+
+  // CÁC HÀM XỬ LÝ NHÁP (MỚI)
+  async saveDraftToStorage(html: string) {
+    if (!html || html === '<p><br></p>') return; // Không lưu rỗng
+    await Preferences.set({
+      key: this.DRAFT_KEY,
+      value: html,
     });
-    this.listeners.push(show);
+    // console.log('Auto-saved draft');
   }
 
-  // --- LOGIC ---
+  async confirmClear() {
+    // Rung nhẹ báo hiệu
+    await Haptics.impact({ style: ImpactStyle.Medium });
 
+    // Xóa UI
+    this.eventContent = '';
+    this.context.set('');
+
+    // Xóa Storage
+    await Preferences.remove({ key: this.DRAFT_KEY });
+  }
+
+  async loadDraft() {
+    const { value } = await Preferences.get({ key: this.DRAFT_KEY });
+    if (value) {
+      this.eventContent = value;
+      // Strip HTML đơn giản để update signal context (để nút Save sáng lên)
+      const plainText = value.replace(/<[^>]*>/g, ' ').trim();
+      this.context.set(plainText);
+    }
+  }
+
+  // --- 3. CÁC HÀM CŨ GIỮ NGUYÊN LOGIC ---
+  filterTags(term: string) {
+    const all = this.tagService.uniqueTags();
+    if (!all || all.length === 0) {
+      this.showSuggestions.set(false);
+      return;
+    }
+    const matches = all.filter((t) =>
+      t.toLowerCase().includes(term.toLowerCase())
+    );
+    if (matches.length > 0) {
+      this.filteredTags.set(matches);
+      this.showSuggestions.set(true);
+    } else {
+      this.showSuggestions.set(false);
+    }
+  }
+
+  selectTag(tag: string) {
+    if (!this.quillInstance) return;
+
+    const selection = this.quillInstance.getSelection();
+    if (selection) {
+      const index = selection.index;
+      const textBefore = this.quillInstance.getText(0, index);
+      const lastHash = textBefore.lastIndexOf('#');
+
+      if (lastHash !== -1) {
+        // Xóa text từ dấu # đến con trỏ
+        this.quillInstance.deleteText(lastHash, index - lastHash);
+        // Chèn tag mới vào
+        this.quillInstance.insertText(lastHash, `#${tag} `);
+
+        this.showSuggestions.set(false);
+        this.quillInstance.focus();
+      }
+    }
+  }
+
+  // Logic màu sắc (giữ nguyên)
   dynamicColor = computed(() => {
     switch (this.selectedType()) {
       case SelfOpsEventType.DECISION:
@@ -563,65 +755,6 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
     this.selectedEmotions.set(currentSet);
   }
 
-  // Detect Hashtag
-  async onContextChange(newVal: string) {
-    this.context.set(newVal);
-    const textarea = await this.mainInput.getInputElement();
-    const cursor = textarea.selectionStart || 0;
-    this.cursorPos = cursor;
-
-    const textUpToCursor = newVal.slice(0, cursor);
-    const lastHashIndex = textUpToCursor.lastIndexOf('#');
-
-    if (lastHashIndex !== -1) {
-      const textAfterHash = textUpToCursor.slice(lastHashIndex + 1);
-      // Regex: Chỉ chữ cái, số, gạch dưới, không khoảng trắng
-      if (!/\s/.test(textAfterHash)) {
-        this.filterTags(textAfterHash);
-        return;
-      }
-    }
-    this.showSuggestions.set(false);
-  }
-
-  filterTags(term: string) {
-    const all = this.tagService.uniqueTags();
-    if (!all || all.length === 0) {
-      this.showSuggestions.set(false);
-      return;
-    }
-    const matches = all.filter((t) =>
-      t.toLowerCase().includes(term.toLowerCase())
-    );
-    if (matches.length > 0) {
-      this.filteredTags.set(matches);
-      this.showSuggestions.set(true);
-    } else {
-      this.showSuggestions.set(false);
-    }
-  }
-
-  async selectTag(tag: string) {
-    const fullText = this.context();
-    const cursor = this.cursorPos;
-    const textUpToCursor = fullText.slice(0, cursor);
-    const lastHashIndex = textUpToCursor.lastIndexOf('#');
-
-    if (lastHashIndex !== -1) {
-      const beforeHash = fullText.slice(0, lastHashIndex);
-      const afterCursor = fullText.slice(cursor);
-      const newText = `${beforeHash}#${tag} ${afterCursor}`;
-
-      this.context.set(newText);
-      this.showSuggestions.set(false);
-
-      setTimeout(async () => {
-        const textarea = await this.mainInput.getInputElement();
-        textarea.focus();
-      }, 50);
-    }
-  }
-
   private extractTags(text: string): string[] {
     const regex = /#[\w\u00C0-\u1EF9]+/g;
     const matches = text.match(regex);
@@ -635,7 +768,7 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
 
   async save() {
     const rawText = this.context();
-    if (!rawText) return;
+    if (!rawText) return; // Validate dựa trên text thuần
 
     await Haptics.impact({ style: ImpactStyle.Medium });
     this.isSaving.set(true);
@@ -649,7 +782,8 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
       const newEvent: SelfOpsEvent = {
         uuid: AppUtils.generateUUID(),
         type: this.selectedType(),
-        context: rawText,
+        // LƯU Ý: Lưu HTML của Quill vào DB
+        context: this.eventContent,
         emotion: emotionStr,
         tags: extractedTags,
         meta_data: [],
@@ -659,6 +793,8 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
       };
 
       await this.databaseService.addEvent(newEvent);
+      // Xóa nháp sau khi lưu thành công
+      await Preferences.remove({ key: this.DRAFT_KEY });
       await Haptics.notification({ type: NotificationType.Success });
       await this.modalCtrl.dismiss(true, 'confirm');
     } catch (e) {
@@ -667,5 +803,21 @@ export class AddEventModalComponent implements OnInit, OnDestroy {
     } finally {
       this.isSaving.set(false);
     }
+  }
+
+  async initKeyboardListener() {
+    const show = await Keyboard.addListener('keyboardDidShow', () => {
+      setTimeout(() => {
+        if (this.inputContainer?.nativeElement) {
+          const inputTop = this.inputContainer.nativeElement.offsetTop;
+
+          if (this.content) {
+            const y = Math.max(0, inputTop - 60);
+            this.content.scrollToPoint(0, y, 300);
+          }
+        }
+      }, 50);
+    });
+    this.listeners.push(show);
   }
 }

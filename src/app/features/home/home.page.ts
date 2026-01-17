@@ -244,9 +244,10 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
                     </div>
                   </div>
 
-                  <div class="card-body text-truncate">
-                    {{ event.context }}
-                  </div>
+                  <div
+                    class="card-body text-truncate"
+                    [innerHTML]="event.context"
+                  ></div>
 
                   <div class="card-footer">
                     <div class="tags-list">
@@ -278,7 +279,7 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
               <ion-spinner name="dots" color="medium"></ion-spinner>
             </div>
             }
-            <div style="height: 100px"></div>
+            <div class="list-end-spacer"></div>
           </cdk-virtual-scroll-viewport>
           }
         </div>
@@ -645,7 +646,7 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         min-height: 110px;
         transition: transform 0.1s;
 
-        /* 🔥 Performance Boost: 
+        /* Performance Boost: 
            Trình duyệt biết nội dung card ko ảnh hưởng layout bên ngoài 
         */
         contain: content;
@@ -693,6 +694,33 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
+      }
+
+      .card-body ::ng-deep p {
+        margin: 0;
+        padding: 0;
+        display: inline;
+      }
+
+      /* Nếu có list trong card thì ẩn bullet point đi cho gọn */
+      .card-body ::ng-deep ul,
+      .card-body ::ng-deep ol {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: inline;
+      }
+      .card-body ::ng-deep li {
+        display: inline;
+        margin-right: 5px; /* Thêm khoảng cách nhỏ giữa các ý */
+      }
+      /* Thêm dấu phẩy hoặc gạch giữa các li nếu muốn (tùy chọn) */
+      .card-body ::ng-deep li::after {
+        content: ' • ';
+        color: var(--ion-color-medium);
+      }
+      .card-body ::ng-deep li:last-child::after {
+        content: '';
       }
 
       .card-footer {
@@ -816,6 +844,22 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
           border-color: #333;
         }
       }
+
+      /* Tăng chiều cao vùng đệm cuối cùng lên bằng chiều cao màn hình */
+      /* Điều này đảm bảo Viewport LUÔN LUÔN có thể scroll được, dù chỉ có 1 item */
+      .list-end-spacer {
+        height: 45vh;
+        width: 100%;
+
+        /* Optional: Thêm cái này để trông nó "xịn" hơn, đỡ giống lỗi */
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 20px;
+        color: var(--ion-color-medium);
+        font-size: 0.8rem;
+        opacity: 0.5;
+      }
     `,
   ],
 })
@@ -863,7 +907,7 @@ export class HomePage implements OnInit, OnDestroy {
 
   @ViewChild(CdkVirtualScrollViewport)
   set viewportRef(vp: CdkVirtualScrollViewport) {
-    // 1. Unsubscribe old
+    // Unsubscribe old
     if (this.scrollSubscription) {
       this.scrollSubscription.unsubscribe();
       this.scrollSubscription = undefined;
@@ -872,7 +916,7 @@ export class HomePage implements OnInit, OnDestroy {
     this._viewport = vp;
     if (!vp) return;
 
-    // 2. Subscribe new (Zoneless logic using RxJS)
+    // Subscribe new (Zoneless logic using RxJS)
     this.scrollSubscription = vp
       .elementScrolled()
       .pipe(debounceTime(10), takeUntil(this.destroy$))
@@ -1030,6 +1074,7 @@ export class HomePage implements OnInit, OnDestroy {
   getEventConfig(type: string) {
     return AppUtils.getTypeConfig(type as SelfOpsEventType);
   }
+
   trackByFn(index: number, item: SelfOpsEvent) {
     return item.uuid;
   }

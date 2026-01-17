@@ -31,6 +31,7 @@ import {
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
+  alertCircleOutline,
   checkmarkOutline,
   closeOutline,
   happyOutline,
@@ -93,9 +94,10 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
           </div>
         </div>
 
-        <div class="context-body">
-          {{ state.originalEvent.context }}
-        </div>
+        <div
+          class="context-body"
+          [innerHTML]="state.originalEvent.context"
+        ></div>
 
         @if (state.tags.length > 0 || state.emotions.length > 0) {
         <div class="meta-footer">
@@ -194,7 +196,6 @@ import { AppUtils } from 'src/app/core/utils/app.utils';
         font-weight: 800;
         font-size: 1.1rem;
         opacity: 0.9;
-        text-align: center;
       }
 
       /* --- 1. RECAP CARD (Styled like a ticket/card) --- */
@@ -428,6 +429,7 @@ export class EventDetailModalComponent implements OnInit, OnDestroy {
       happyOutline,
       helpBuoyOutline,
       pricetagsOutline,
+      alertCircleOutline,
     });
   }
 

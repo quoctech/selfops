@@ -22,11 +22,12 @@
 /* Import Dark Mode System */
 @import '@ionic/angular/css/palettes/dark.system.css';
 
+@import "quill/dist/quill.snow.css";
+
 /* ==============================================
    1. THEME DEFINITION - LIGHT MODE (Mặc định)
    ============================================== */
 :root {
-    /** 🔥 RGB VARS (Bắt buộc cho Glass Effect) **/
     --ion-background-color: #f8fafc;
     --ion-background-color-rgb: 248, 250, 252;
 
@@ -129,4 +130,22 @@ body.dark {
 html,
 body {
     background-color: var(--ion-background-color);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+/* Tùy chỉnh nhẹ cho mượt trên Mobile */
+.ql-editor {
+    min-height: 200px;
+    font-size: 16px;
+    line-height: 1.5;
+    background: var(--ion-background-color);
+    color: var(--ion-text-color);
+}
+
+.ql-toolbar.ql-snow {
+    background: var(--ion-color-light);
+    border: none;
+    border-bottom: 1px solid var(--ion-color-medium);
 }

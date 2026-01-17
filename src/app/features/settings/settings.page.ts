@@ -362,8 +362,8 @@ import { NotificationService } from 'src/app/core/services/notification.service'
          3. PREMIUM LIST & ITEMS
       ========================================= */
       .premium-list {
-        margin-top: 16px;
-        margin-bottom: 24px;
+        margin-top: 4px;
+        margin-bottom: 4px;
         background: transparent;
         contain: content;
       }
