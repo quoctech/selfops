@@ -189,14 +189,33 @@ export class EventRepository {
         all = all.filter((e) => e.type === filterType);
       }
 
+      if (filterTag) {
+        all = all.filter((e) => (e.tags || []).includes(filterTag));
+      }
+
       if (searchQuery && searchQuery.trim() !== '') {
         const lowerQ = searchQuery.toLowerCase().trim();
-        all = all.filter(
-          (e) =>
-            e.context.toLowerCase().includes(lowerQ) ||
-            (e.emotion && e.emotion.toLowerCase().includes(lowerQ))
-        );
+        all = all.filter((e) => {
+          // Strip HTML tags để chỉ tìm trong text (tránh tìm nhầm chữ 'p' trong <p>)
+          const cleanContext = (e.context || '')
+            .replace(/<[^>]*>/g, ' ')
+            .toLowerCase();
+          const inContext = cleanContext.includes(lowerQ);
+
+          // Tìm trong Emotion
+          const inEmotion =
+            e.emotion && e.emotion.toLowerCase().includes(lowerQ);
+
+          // Tìm trong mảng Tags (nếu user gõ tên tag vào ô search)
+          const inTags = (e.tags || []).some((t) =>
+            t.toLowerCase().includes(lowerQ)
+          );
+
+          return inContext || inEmotion || inTags;
+        });
       }
+
+      all.sort((a, b) => b.created_at - a.created_at);
 
       const start = page * size;
       return all.slice(start, start + size);
