@@ -273,7 +273,7 @@ import { NotificationService } from 'src/app/core/services/notification.service'
             (mousedown)="startPress()"
             (mouseup)="endPress()"
           >
-            v1.3.2 (Build 2026.01)
+            v1.3.3 (Build 2026.01)
           </div>
         </div>
       </div>
