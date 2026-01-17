@@ -102,7 +102,7 @@ import { DatabaseService } from 'src/app/core/services/database/database.service
             [style.--active-color]="scoreColor()"
           >
             <span slot="start" class="range-hint">😫</span>
-            <span slot="end" class="range-hint">🤣</span>
+            <span slot="end" class="range-hint">😁</span>
           </ion-range>
         </div>
 
@@ -332,45 +332,51 @@ export class DailyCheckInComponent implements OnInit {
   // --- LOGIC: 5 Levels of Emotion with modern Emojis ---
   scoreConfig = computed(() => {
     const s = this.score();
-    // 0-20: Tệ (Rất buồn)
+
+    // 0–20: Tệ
     if (s <= 20)
       return {
-        color: '#EF4444', // Danger Red
-        emoji: '😫',
+        color: '#EF4444',
+        emoji: '😔',
         label: 'Tệ hại',
       };
-    // 21-40: Áp lực (Hơi buồn/mệt)
+
+    // 21–40: Áp lực
     if (s <= 40)
       return {
-        color: '#F59E0B', // Warning Orange
-        emoji: '🙁',
+        color: '#F59E0B',
+        emoji: '😕',
         label: 'Áp lực',
       };
-    // 41-60: Bình thường (Ổn)
+
+    // 41–60: Bình thường
     if (s <= 60)
       return {
-        color: '#6B7280', // Gray/Medium
-        emoji: '😐',
+        color: '#6B7280',
+        emoji: '🥰', // trung tính, không gây ngứa
         label: 'Bình thường',
       };
-    // 61-80: Tốt (Vui)
+
+    // 61–80: Khá tốt
     if (s <= 80)
       return {
-        color: '#3B82F6', // Primary Blue
-        emoji: '🙂',
+        color: '#3B82F6',
+        emoji: '😊', // cười nhẹ, dễ chịu
         label: 'Khá tốt',
       };
-    // 81-95: Tuyệt vời (Rất vui)
+
+    // 81–95: Tuyệt vời
     if (s <= 95)
       return {
-        color: '#10B981', // Success Green
-        emoji: '😂',
+        color: '#10B981',
+        emoji: '😄', // vui rõ nhưng không lố
         label: 'Tuyệt vời',
       };
-    // 96-100: Đỉnh cao (Cười rớt nước mắt)
+
+    // 96–100: Đỉnh cao
     return {
-      color: '#8B5CF6', // Purple Accent
-      emoji: '🤣',
+      color: '#8B5CF6',
+      emoji: '😁',
       label: 'Đỉnh cao',
     };
   });
